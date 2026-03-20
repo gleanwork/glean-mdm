@@ -129,7 +129,9 @@ async function main(): Promise<void> {
 }
 
 const isDirectExecution =
-  typeof process !== 'undefined' && process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))
+  typeof process !== 'undefined' &&
+  process.argv[1] &&
+  decodeURIComponent(import.meta.url).endsWith(process.argv[1].replace(/\\/g, '/'))
 
 if (isDirectExecution) {
   main().catch((err) => {
