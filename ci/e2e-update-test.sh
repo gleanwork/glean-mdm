@@ -13,14 +13,15 @@ MOCK_PID=""
 cleanup() {
   echo "=== Cleanup ==="
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null || true
-  rm -f "$PORT_FILE" "$CONFIG_FILE" "$INSTALL_PATH" "$LOG_FILE"
+  rm -f "$PORT_FILE" "$CONFIG_FILE" "$INSTALL_PATH"
+  sudo rm -f "$LOG_FILE"
   rm -rf /usr/local/bin/.glean-mdm-update-*
 }
 trap cleanup EXIT
 
 echo "=== Prepare environment ==="
 sudo chown "$(whoami)" /usr/local/bin
-touch "$LOG_FILE" && chmod 666 "$LOG_FILE"
+sudo touch "$LOG_FILE" && sudo chmod 666 "$LOG_FILE"
 
 echo "=== Install old binary ==="
 cp "$OLD_BINARY" "$INSTALL_PATH"
