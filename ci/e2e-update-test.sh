@@ -4,22 +4,9 @@ set -euo pipefail
 OLD_BINARY="${1:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 NEW_BINARY="${2:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 
-# Portable timeout: macOS lacks GNU timeout
-run_with_timeout() {
-  local secs=$1; shift
-  "$@" &
-  local pid=$!
-  ( sleep "$secs"; kill "$pid" 2>/dev/null ) &
-  local watcher=$!
-  wait "$pid" 2>/dev/null
-  local rc=$?
-  kill "$watcher" 2>/dev/null
-  wait "$watcher" 2>/dev/null || true
-  return $rc
-}
-
 PORT_FILE="$(mktemp)"
 CONFIG_FILE="$(mktemp)"
+RUN_OUTPUT="$(mktemp)"
 MOCK_PID=""
 
 # Platform-specific paths matching src/platform.ts
@@ -49,7 +36,7 @@ esac
 cleanup() {
   echo "=== Cleanup ==="
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null || true
-  rm -f "$PORT_FILE" "$CONFIG_FILE" "$INSTALL_PATH"
+  rm -f "$PORT_FILE" "$CONFIG_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
   rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
   case "$(uname -s)" in
     Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
@@ -74,7 +61,9 @@ esac
 echo "=== Install old binary ==="
 cp "$OLD_BINARY" "$INSTALL_PATH"
 chmod 755 "$INSTALL_PATH"
-echo "Old binary version: $("$INSTALL_PATH" --version | tr -d '\r')"
+"$INSTALL_PATH" --version > "$RUN_OUTPUT" 2>&1 || true
+OLD_VER=$(tr -d '\r' < "$RUN_OUTPUT")
+echo "Old binary version: $OLD_VER"
 
 echo "=== Start mock server ==="
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -115,30 +104,37 @@ EOF
 echo "Config: $(cat "$CONFIG_FILE")"
 
 echo "=== Run old binary (triggers update) ==="
-run_with_timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1 | tr -d '\r' || {
+"$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Binary exited with code $EXIT_CODE"
+  echo "=== Output ==="
+  tr -d '\r' < "$RUN_OUTPUT"
   echo "=== Log file ==="
   cat "$LOG_FILE" 2>/dev/null || true
   exit 1
 }
+tr -d '\r' < "$RUN_OUTPUT"
 
 echo "=== Verify update ==="
-INSTALLED_VERSION=$("$INSTALL_PATH" --version | tr -d '\r')
+"$INSTALL_PATH" --version > "$RUN_OUTPUT" 2>&1 || true
+INSTALLED_VERSION=$(tr -d '\r' < "$RUN_OUTPUT")
 echo "Installed version: $INSTALLED_VERSION"
 
 if [ "$INSTALLED_VERSION" != "99.0.0" ]; then
   echo "FAIL: Expected version 99.0.0, got $INSTALLED_VERSION"
+  echo "=== Log file ==="
+  cat "$LOG_FILE" 2>/dev/null || true
   exit 1
 fi
 
 echo "=== Run new binary again (should not update) ==="
-RUN2_OUTPUT=$(run_with_timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1 | tr -d '\r') || {
+"$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Second run exited with code $EXIT_CODE"
-  echo "$RUN2_OUTPUT"
+  tr -d '\r' < "$RUN_OUTPUT"
   exit 1
 }
+RUN2_OUTPUT=$(tr -d '\r' < "$RUN_OUTPUT")
 echo "$RUN2_OUTPUT"
 
 if echo "$RUN2_OUTPUT" | grep -q "Already up to date"; then
