@@ -74,7 +74,7 @@ esac
 echo "=== Install old binary ==="
 cp "$OLD_BINARY" "$INSTALL_PATH"
 chmod 755 "$INSTALL_PATH"
-echo "Old binary version: $("$INSTALL_PATH" --version)"
+echo "Old binary version: $("$INSTALL_PATH" --version | tr -d '\r')"
 
 echo "=== Start mock server ==="
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -115,7 +115,7 @@ EOF
 echo "Config: $(cat "$CONFIG_FILE")"
 
 echo "=== Run old binary (triggers update) ==="
-run_with_timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1 || {
+run_with_timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1 | tr -d '\r' || {
   EXIT_CODE=$?
   echo "FAIL: Binary exited with code $EXIT_CODE"
   echo "=== Log file ==="
@@ -124,7 +124,7 @@ run_with_timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(
 }
 
 echo "=== Verify update ==="
-INSTALLED_VERSION=$("$INSTALL_PATH" --version)
+INSTALLED_VERSION=$("$INSTALL_PATH" --version | tr -d '\r')
 echo "Installed version: $INSTALLED_VERSION"
 
 if [ "$INSTALLED_VERSION" != "99.0.0" ]; then
@@ -133,7 +133,7 @@ if [ "$INSTALLED_VERSION" != "99.0.0" ]; then
 fi
 
 echo "=== Run new binary again (should not update) ==="
-RUN2_OUTPUT=$(run_with_timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1) || {
+RUN2_OUTPUT=$(run_with_timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1 | tr -d '\r') || {
   EXIT_CODE=$?
   echo "FAIL: Second run exited with code $EXIT_CODE"
   echo "$RUN2_OUTPUT"
