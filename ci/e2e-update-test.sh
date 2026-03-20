@@ -84,4 +84,20 @@ if [ "$INSTALLED_VERSION" != "99.0.0" ]; then
   exit 1
 fi
 
+echo "=== Run new binary again (should not update) ==="
+RUN2_OUTPUT=$(timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1) || {
+  EXIT_CODE=$?
+  echo "FAIL: Second run exited with code $EXIT_CODE"
+  echo "$RUN2_OUTPUT"
+  exit 1
+}
+echo "$RUN2_OUTPUT"
+
+if echo "$RUN2_OUTPUT" | grep -q "Already up to date"; then
+  echo "Confirmed: no update on second run"
+else
+  echo "FAIL: Expected 'Already up to date' in second run output"
+  exit 1
+fi
+
 echo "PASS: E2E update test succeeded"
