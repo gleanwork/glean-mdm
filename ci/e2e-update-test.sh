@@ -4,24 +4,58 @@ set -euo pipefail
 OLD_BINARY="${1:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 NEW_BINARY="${2:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 
-INSTALL_PATH="/usr/local/bin/glean-mdm"
-LOG_FILE="/var/log/glean-mdm.log"
 PORT_FILE="$(mktemp)"
 CONFIG_FILE="$(mktemp)"
 MOCK_PID=""
+
+# Platform-specific paths matching src/platform.ts
+case "$(uname -s)" in
+  Linux)
+    INSTALL_DIR="/usr/local/bin"
+    INSTALL_PATH="$INSTALL_DIR/glean-mdm"
+    LOG_FILE="/var/log/glean-mdm.log"
+    ;;
+  Darwin)
+    INSTALL_DIR="/usr/local/bin"
+    INSTALL_PATH="$INSTALL_DIR/glean-mdm"
+    LOG_FILE="/var/log/glean-mdm.log"
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    INSTALL_DIR="/c/Program Files/Glean"
+    INSTALL_PATH="$INSTALL_DIR/glean-mdm.exe"
+    LOG_DIR="/c/ProgramData/Glean MDM"
+    LOG_FILE="$LOG_DIR/glean-mdm.log"
+    ;;
+  *)
+    echo "FAIL: Unsupported platform: $(uname -s)"
+    exit 1
+    ;;
+esac
 
 cleanup() {
   echo "=== Cleanup ==="
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null || true
   rm -f "$PORT_FILE" "$CONFIG_FILE" "$INSTALL_PATH"
-  sudo rm -f "$LOG_FILE"
-  rm -rf /usr/local/bin/.glean-mdm-update-*
+  rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
+  case "$(uname -s)" in
+    Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
+    *) rm -f "$LOG_FILE" ;;
+  esac
 }
 trap cleanup EXIT
 
 echo "=== Prepare environment ==="
-sudo chown "$(whoami)" /usr/local/bin
-sudo touch "$LOG_FILE" && sudo chmod 666 "$LOG_FILE"
+case "$(uname -s)" in
+  Linux|Darwin)
+    sudo chown "$(whoami)" "$INSTALL_DIR"
+    sudo touch "$LOG_FILE" && sudo chmod 666 "$LOG_FILE"
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    mkdir -p "$INSTALL_DIR"
+    mkdir -p "$LOG_DIR"
+    touch "$LOG_FILE"
+    ;;
+esac
 
 echo "=== Install old binary ==="
 cp "$OLD_BINARY" "$INSTALL_PATH"

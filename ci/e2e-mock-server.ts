@@ -36,11 +36,10 @@ const server = Bun.serve({
     console.log(`${req.method} ${url.pathname}${url.search}`)
 
     if (url.pathname === '/api/v1/mdm/version') {
-      const target = 'linux-x64'
-      return Response.json({
-        checksums: { [target]: checksum },
-        version,
-      })
+      const targets = ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'windows-x64']
+      const checksums: Record<string, string> = {}
+      for (const t of targets) checksums[t] = checksum
+      return Response.json({ checksums, version })
     }
 
     if (url.pathname === '/api/v1/mdm/binary') {
