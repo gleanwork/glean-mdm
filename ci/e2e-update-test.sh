@@ -61,9 +61,15 @@ esac
 echo "=== Install old binary ==="
 cp "$OLD_BINARY" "$INSTALL_PATH"
 chmod 755 "$INSTALL_PATH"
+echo "Binary source size: $(wc -c < "$OLD_BINARY") bytes"
+echo "Binary installed size: $(wc -c < "$INSTALL_PATH") bytes"
+echo "--- Direct version call (no redirect) ---"
+"$INSTALL_PATH" --version || true
+echo "--- Redirected version call ---"
 "$INSTALL_PATH" --version > "$RUN_OUTPUT" 2>&1 || true
+echo "Output file size: $(wc -c < "$RUN_OUTPUT") bytes"
 OLD_VER=$(tr -d '\r' < "$RUN_OUTPUT")
-echo "Old binary version: $OLD_VER"
+echo "Old binary version: '$OLD_VER'"
 
 echo "=== Start mock server ==="
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
