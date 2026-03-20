@@ -63,7 +63,7 @@ async function main(): Promise<void> {
   }
 
   initLogger()
-  log.info(`glean-mdm-setup ${BUILD_VERSION}`)
+  log.info(`glean-mdm ${BUILD_VERSION}`)
 
   if (args.subcommand === 'install-schedule') {
     installSchedule()

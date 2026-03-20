@@ -4,7 +4,7 @@ import { schtasksCreateArgs } from './scheduler'
 
 describe('schtasksCreateArgs', () => {
   it('passes the binary path as a single argv element (paths with spaces)', () => {
-    const pathWithSpaces = 'C:\\Program Files\\Glean\\glean-mdm-setup.exe'
+    const pathWithSpaces = 'C:\\Program Files\\Glean\\glean-mdm.exe'
 
     expect(schtasksCreateArgs(pathWithSpaces)).toEqual([
       '/Create',

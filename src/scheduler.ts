@@ -5,8 +5,8 @@ import { log } from './logger.js'
 import { getBinaryInstallPath, getPlatform } from './platform.js'
 
 const MACOS_PLIST_PATH = '/Library/LaunchDaemons/com.glean.mdm-setup.plist'
-const LINUX_SERVICE_PATH = '/etc/systemd/system/glean-mdm-setup.service'
-const LINUX_TIMER_PATH = '/etc/systemd/system/glean-mdm-setup.timer'
+const LINUX_SERVICE_PATH = '/etc/systemd/system/glean-mdm.service'
+const LINUX_TIMER_PATH = '/etc/systemd/system/glean-mdm.timer'
 const WINDOWS_TASK_NAME = 'Glean MDM Setup'
 
 /** Exposed for tests — argv array avoids shell quoting bugs when paths contain spaces. */
@@ -36,9 +36,9 @@ function installMacOSSchedule(): void {
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/var/log/glean-mdm-setup.log</string>
+    <string>/var/log/glean-mdm.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/glean-mdm-setup.log</string>
+    <string>/var/log/glean-mdm.log</string>
 </dict>
 </plist>`
 
@@ -91,13 +91,13 @@ WantedBy=timers.target
   writeFileSync(LINUX_SERVICE_PATH, service)
   writeFileSync(LINUX_TIMER_PATH, timer)
   execSync('systemctl daemon-reload')
-  execSync('systemctl enable --now glean-mdm-setup.timer')
+  execSync('systemctl enable --now glean-mdm.timer')
   log.info('Installed systemd timer schedule')
 }
 
 function uninstallLinuxSchedule(): void {
   try {
-    execSync('systemctl disable --now glean-mdm-setup.timer', {
+    execSync('systemctl disable --now glean-mdm.timer', {
       stdio: 'ignore',
     })
   } catch {

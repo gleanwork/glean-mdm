@@ -1,10 +1,10 @@
-# glean-mdm-setup
+# Glean MDM
 
 A CLI tool for IT/MDM administrators to automatically configure MCP (Model Context Protocol) servers across all supported AI coding tools on managed devices.
 
 ## What it does
 
-`glean-mdm-setup` runs as a system-level process (via launchd, systemd, or Task Scheduler) and ensures every user on a machine has their AI coding tools configured to connect to the organization's Glean MCP server. It:
+`glean-mdm` runs as a system-level process (via launchd, systemd, or Task Scheduler) and ensures every user on a machine has their AI coding tools configured to connect to the organization's Glean MCP server. It:
 
 1. **Reads a central config** (`mcp-config.json`) specifying the Glean server name and URL
 2. **Enumerates local users** on the machine (macOS, Linux, or Windows)
@@ -19,17 +19,17 @@ Configuration is driven by [`@gleanwork/mcp-config-glean`](https://www.npmjs.com
 
 ```bash
 # Run for all users (typically as root/admin)
-glean-mdm-setup
+glean-mdm
 
 # Dry run for a single user
-glean-mdm-setup --dry-run --user alice
+glean-mdm --dry-run --user alice
 
 # Show version
-glean-mdm-setup --version
+glean-mdm --version
 
 # Install/uninstall the system schedule (launchd/systemd/Task Scheduler)
-glean-mdm-setup install-schedule
-glean-mdm-setup uninstall-schedule
+glean-mdm install-schedule
+glean-mdm uninstall-schedule
 ```
 
 ### Configuration
