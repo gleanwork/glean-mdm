@@ -17,3 +17,48 @@ jobs:
       - run: bun install
 
       - run: bunx vitest run
+
+  e2e-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies (main)
+        run: bun install
+        working-directory: main
+
+      - name: Install dependencies (PR)
+        run: bun install
+        working-directory: pr
+
+      - name: Build old binary (main)
+        run: |
+          bun build src/index.ts \
+            --compile \
+            --target=bun-linux-x64 \
+            --define "process.env.BUILD_VERSION=\"0.1.0\"" \
+            --outfile dist/glean-mdm-old
+        working-directory: main
+
+      - name: Build new binary (PR)
+        run: |
+          bun build src/index.ts \
+            --compile \
+            --target=bun-linux-x64 \
+            --define "process.env.BUILD_VERSION=\"99.0.0\"" \
+            --outfile dist/glean-mdm-new
+        working-directory: pr
+
+      - name: Run E2E update test
+        run: pr/ci/e2e-update-test.sh main/dist/glean-mdm-old pr/dist/glean-mdm-new
