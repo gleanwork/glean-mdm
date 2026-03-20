@@ -58,14 +58,17 @@ jobs:
         run: bun install
         working-directory: pr
 
-      - name: Build old binary (main)
+      # On Windows, main branch has a bug where main() never runs due to
+      # URL-encoded spaces in "Program Files" path. Build old binary from PR
+      # branch (which has the fix) until the fix is merged to main.
+      - name: Build old binary
         run: |
           bun build src/index.ts \
             --compile \
             --target=${{ matrix.target }} \
             --define "process.env.BUILD_VERSION=\"0.1.0\"" \
             --outfile dist/glean-mdm-old${{ matrix.ext }}
-        working-directory: main
+        working-directory: ${{ runner.os == 'Windows' && 'pr' || 'main' }}
 
       - name: Build new binary (PR)
         run: |
@@ -77,4 +80,6 @@ jobs:
         working-directory: pr
 
       - name: Run E2E update test
-        run: pr/ci/e2e-update-test.sh main/dist/glean-mdm-old${{ matrix.ext }} pr/dist/glean-mdm-new${{ matrix.ext }}
+        run: |
+          OLD=${{ runner.os == 'Windows' && 'pr' || 'main' }}/dist/glean-mdm-old${{ matrix.ext }}
+          pr/ci/e2e-update-test.sh "$OLD" pr/dist/glean-mdm-new${{ matrix.ext }}
