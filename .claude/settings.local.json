@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__glean_default__search",
+      "mcp__glean_default__code_search",
+      "mcp__glean_default__read_document",
+      "Bash(find /Users/thoov/Code/@gleanwork/glean-mdm -type f \\\\\\(-name *.ts -o -name *.tsx -o -name *.js -o -name *.json -o -name *.sh \\\\\\))",
+      "Bash(find /Users/thoov/Code/@gleanwork/glean-mdm -type f -name *.ts -o -name *.json -o -name *.sh)",
+      "Bash(curl -s https://api.github.com/repos/askscio/scio/contents/typescript/mdm-setup?ref=thoov/mdm-auto-updater)",
+      "Bash(curl -s https://api.github.com/repos/gleanwork/glean-mdm/branches)",
+      "Bash(chmod:*)",
+      "Bash(bun install:*)",
+      "Bash(bunx vitest:*)",
+      "Bash(bun run:*)"
+    ]
+  }
+}

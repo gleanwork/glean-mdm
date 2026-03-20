@@ -49,12 +49,12 @@ describe('getDefaultConfigPath', () => {
 
 describe('getLogFilePath', () => {
   it('returns a path ending with the log filename', () => {
-    expect(getLogFilePath()).toContain('glean-mdm-setup.log')
+    expect(getLogFilePath()).toContain('glean-mdm.log')
   })
 })
 
 describe('getBinaryInstallPath', () => {
   it('returns a path containing the binary name', () => {
-    expect(getBinaryInstallPath()).toContain('glean-mdm-setup')
+    expect(getBinaryInstallPath()).toContain('glean-mdm')
   })
 })

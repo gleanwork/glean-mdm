@@ -31,5 +31,5 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            dist/glean-mdm-setup-*
+            dist/glean-mdm-*
             dist/version.json

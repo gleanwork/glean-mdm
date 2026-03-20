@@ -9,7 +9,7 @@ DIST_DIR="dist"
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
-echo "Building glean-mdm-setup ${VERSION}..."
+echo "Building glean-mdm ${VERSION}..."
 
 for target in \
   "bun-darwin-arm64" \
@@ -18,7 +18,7 @@ for target in \
   "bun-linux-arm64" \
   "bun-windows-x64"; do
 
-  outname="glean-mdm-setup-${target#bun-}"
+  outname="glean-mdm-${target#bun-}"
   echo "  → ${outname}"
 
   bun build src/index.ts \
@@ -36,10 +36,10 @@ checksums_json="{"
 checksums_json+="\"version\":\"${VERSION}\","
 checksums_json+="\"checksums\":{"
 first=true
-for binary in glean-mdm-setup-*; do
+for binary in glean-mdm-*; do
   hash=$(shasum -a 256 "$binary" | cut -d' ' -f1)
-  # Extract target name (e.g., "darwin-arm64" from "glean-mdm-setup-darwin-arm64")
-  target_name="${binary#glean-mdm-setup-}"
+  # Extract target name (e.g., "darwin-arm64" from "glean-mdm-darwin-arm64")
+  target_name="${binary#glean-mdm-}"
   target_name="${target_name%.exe}"
   if [ "$first" = true ]; then
     first=false

@@ -35,12 +35,12 @@ export function getDefaultConfigPath(): string {
 
 export function getLogFilePath(): string {
   const p = getPlatform()
-  if (p === 'win32') return 'C:\\ProgramData\\Glean MDM\\glean-mdm-setup.log'
-  return '/var/log/glean-mdm-setup.log'
+  if (p === 'win32') return 'C:\\ProgramData\\Glean MDM\\glean-mdm.log'
+  return '/var/log/glean-mdm.log'
 }
 
 export function getBinaryInstallPath(): string {
   const p = getPlatform()
-  if (p === 'win32') return 'C:\\Program Files\\Glean\\glean-mdm-setup.exe'
-  return '/usr/local/bin/glean-mdm-setup'
+  if (p === 'win32') return 'C:\\Program Files\\Glean\\glean-mdm.exe'
+  return '/usr/local/bin/glean-mdm'
 }

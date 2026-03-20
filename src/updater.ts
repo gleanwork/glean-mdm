@@ -61,7 +61,7 @@ export async function checkForUpdate(backendUrl: string): Promise<boolean> {
   }
 
   const binaryPath = getBinaryInstallPath()
-  const tmpDir = mkdtempSync(join(dirname(binaryPath), '.glean-mdm-setup-update-'))
+  const tmpDir = mkdtempSync(join(dirname(binaryPath), '.glean-mdm-update-'))
   const tmpPath = join(tmpDir, 'binary')
 
   try {
