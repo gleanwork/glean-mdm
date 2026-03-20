@@ -4,6 +4,20 @@ set -euo pipefail
 OLD_BINARY="${1:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 NEW_BINARY="${2:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 
+# Portable timeout: macOS lacks GNU timeout
+run_with_timeout() {
+  local secs=$1; shift
+  "$@" &
+  local pid=$!
+  ( sleep "$secs"; kill "$pid" 2>/dev/null ) &
+  local watcher=$!
+  wait "$pid" 2>/dev/null
+  local rc=$?
+  kill "$watcher" 2>/dev/null
+  wait "$watcher" 2>/dev/null || true
+  return $rc
+}
+
 PORT_FILE="$(mktemp)"
 CONFIG_FILE="$(mktemp)"
 MOCK_PID=""
@@ -101,7 +115,7 @@ EOF
 echo "Config: $(cat "$CONFIG_FILE")"
 
 echo "=== Run old binary (triggers update) ==="
-timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1 || {
+run_with_timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Binary exited with code $EXIT_CODE"
   echo "=== Log file ==="
@@ -119,7 +133,7 @@ if [ "$INSTALLED_VERSION" != "99.0.0" ]; then
 fi
 
 echo "=== Run new binary again (should not update) ==="
-RUN2_OUTPUT=$(timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1) || {
+RUN2_OUTPUT=$(run_with_timeout 60 "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" 2>&1) || {
   EXIT_CODE=$?
   echo "FAIL: Second run exited with code $EXIT_CODE"
   echo "$RUN2_OUTPUT"
