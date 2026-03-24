@@ -36,6 +36,12 @@ case "$(uname -s)" in
     ;;
 esac
 
+# The binary writes to privileged paths — use sudo on Linux/macOS
+case "$(uname -s)" in
+  Linux|Darwin) SUDO="sudo" ;;
+  *)            SUDO="" ;;
+esac
+
 cleanup() {
   echo "=== Cleanup ==="
   case "$SCHEDULE_TYPE" in
@@ -96,7 +102,7 @@ chmod 755 "$INSTALL_PATH"
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== Test 1: install-schedule ==="
-"$INSTALL_PATH" install-schedule > "$RUN_OUTPUT" 2>&1 || {
+$SUDO "$INSTALL_PATH" install-schedule > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL [install-schedule]: Binary exited with code $EXIT_CODE"
   echo "=== Output ==="
@@ -188,7 +194,7 @@ esac
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== Test 2: install-schedule idempotency ==="
-"$INSTALL_PATH" install-schedule > "$RUN_OUTPUT" 2>&1 || {
+$SUDO "$INSTALL_PATH" install-schedule > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL [install-idempotent]: Second install exited with code $EXIT_CODE"
   echo "=== Output ==="
@@ -203,7 +209,7 @@ echo "PASS [install-idempotent]: Second install-schedule succeeded without error
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== Test 3: uninstall-schedule ==="
-"$INSTALL_PATH" uninstall-schedule > "$RUN_OUTPUT" 2>&1 || {
+$SUDO "$INSTALL_PATH" uninstall-schedule > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL [uninstall-schedule]: Binary exited with code $EXIT_CODE"
   echo "=== Output ==="
@@ -275,7 +281,7 @@ esac
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== Test 4: uninstall-schedule idempotency ==="
-"$INSTALL_PATH" uninstall-schedule > "$RUN_OUTPUT" 2>&1 || {
+$SUDO "$INSTALL_PATH" uninstall-schedule > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL [uninstall-idempotent]: Second uninstall exited with code $EXIT_CODE"
   echo "=== Output ==="
