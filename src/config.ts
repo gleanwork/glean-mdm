@@ -14,6 +14,10 @@ export const MdmConfigSchema = z.object({
     (val) => (typeof val === 'string' && SEMVER_PATTERN.test(val) ? val : undefined),
     z.string().optional(),
   ),
+  binaryUrlPrefix: z.preprocess(
+    (val) => (typeof val === 'string' && val.length > 0 ? val.replace(/\/+$/, '') : val),
+    z.string().url(),
+  ),
 })
 
 export type MdmConfig = z.infer<typeof MdmConfigSchema>

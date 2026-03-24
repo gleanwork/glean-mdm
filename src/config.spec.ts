@@ -6,6 +6,7 @@ describe('MdmConfigSchema', () => {
   const VALID_CONFIG = {
     serverName: 'glean_default',
     url: 'https://customer-be.glean.com/mcp/default',
+    binaryUrlPrefix: 'https://app.glean.com/static/mdm/binaries',
   }
 
   it('accepts a valid config', () => {
@@ -113,6 +114,45 @@ describe('MdmConfigSchema', () => {
 
         expect(result.success).toBe(true)
         if (result.success) expect(result.data.pinnedVersion).toBeUndefined()
+      }
+    })
+  })
+
+  describe('binaryUrlPrefix', () => {
+    it('accepts valid URL strings', () => {
+      for (const prefix of ['https://cdn.example.com/mdm/binaries', 'https://internal.corp/assets']) {
+        const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, binaryUrlPrefix: prefix })
+
+        expect(result.success).toBe(true)
+        if (result.success) expect(result.data.binaryUrlPrefix).toBe(prefix)
+      }
+    })
+
+    it('strips trailing slashes', () => {
+      const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, binaryUrlPrefix: 'https://cdn.example.com/binaries/' })
+
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.binaryUrlPrefix).toBe('https://cdn.example.com/binaries')
+    })
+
+    it('rejects missing binaryUrlPrefix', () => {
+      const { binaryUrlPrefix: _, ...configWithout } = VALID_CONFIG
+      expect(MdmConfigSchema.safeParse(configWithout).success).toBe(false)
+    })
+
+    it('rejects empty strings', () => {
+      expect(MdmConfigSchema.safeParse({ ...VALID_CONFIG, binaryUrlPrefix: '' }).success).toBe(false)
+    })
+
+    it('rejects non-URL strings', () => {
+      for (const invalid of ['not-a-url', 'just-text', '/relative/path']) {
+        expect(MdmConfigSchema.safeParse({ ...VALID_CONFIG, binaryUrlPrefix: invalid }).success).toBe(false)
+      }
+    })
+
+    it('rejects non-string values', () => {
+      for (const invalid of [123, true, null]) {
+        expect(MdmConfigSchema.safeParse({ ...VALID_CONFIG, binaryUrlPrefix: invalid }).success).toBe(false)
       }
     })
   })

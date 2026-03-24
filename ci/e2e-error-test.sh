@@ -4,6 +4,7 @@ set -euo pipefail
 BINARY="${1:?Usage: e2e-error-test.sh <binary>}"
 
 PORT_FILE="$(mktemp)"
+BINARY_PORT_FILE="$(mktemp)"
 CONFIG_FILE="$(mktemp)"
 RUN_OUTPUT="$(mktemp)"
 MOCK_PID=""
@@ -35,7 +36,7 @@ esac
 cleanup() {
   echo "=== Cleanup ==="
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null || true
-  rm -f "$PORT_FILE" "$CONFIG_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
+  rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$CONFIG_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
   rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
   case "$(uname -s)" in
     Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
@@ -74,24 +75,26 @@ start_mock_server() {
     MOCK_PID=""
   fi
 
-  # Clear port file
+  # Clear port files
   : > "$PORT_FILE"
+  : > "$BINARY_PORT_FILE"
 
   bun "$SCRIPT_DIR/e2e-error-mock-server.ts" \
     --version-status "$version_status" \
     --binary-status "$binary_status" \
-    --port-file "$PORT_FILE" &
+    --port-file "$PORT_FILE" \
+    --binary-port-file "$BINARY_PORT_FILE" &
   MOCK_PID=$!
 
-  # Wait for port file
+  # Wait for port files
   for i in $(seq 1 30); do
-    if [ -s "$PORT_FILE" ]; then
+    if [ -s "$PORT_FILE" ] && [ -s "$BINARY_PORT_FILE" ]; then
       break
     fi
     sleep 0.1
   done
 
-  if [ ! -s "$PORT_FILE" ]; then
+  if [ ! -s "$PORT_FILE" ] || [ ! -s "$BINARY_PORT_FILE" ]; then
     echo "FAIL: Mock server did not start (no port file after 3s)"
     exit 1
   fi
@@ -103,9 +106,11 @@ run_and_check() {
 
   local port
   port=$(cat "$PORT_FILE")
+  local binary_port
+  binary_port=$(cat "$BINARY_PORT_FILE")
 
   cat > "$CONFIG_FILE" <<EOF
-{"serverName":"e2e_test","url":"http://127.0.0.1:${port}/mcp/default"}
+{"serverName":"e2e_test","url":"http://127.0.0.1:${port}/mcp/default","binaryUrlPrefix":"http://127.0.0.1:${binary_port}/static/mdm/binaries"}
 EOF
 
   "$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {

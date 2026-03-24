@@ -29,12 +29,12 @@ export function shouldUpdate(currentVersion: string, serverVersion: string, pinn
   return compareVersions(currentVersion, targetVersion) < 0
 }
 
-function getBinaryUrl(backendUrl: string, target: string, version: string): string {
+function getBinaryUrl(binaryUrlPrefix: string, target: string, version: string): string {
   const ext = target.startsWith('windows-') ? '.exe' : ''
-  return `${backendUrl}/static/mdm/binaries/${version}/glean-mdm-${target}${ext}`
+  return `${binaryUrlPrefix}/${version}/glean-mdm-${target}${ext}`
 }
 
-export async function checkForUpdate(backendUrl: string, pinnedVersion?: string): Promise<boolean> {
+export async function checkForUpdate(backendUrl: string, binaryUrlPrefix: string, pinnedVersion?: string): Promise<boolean> {
   const target = getTargetName()
   const currentPlatform = getPlatform()
 
@@ -87,7 +87,7 @@ export async function checkForUpdate(backendUrl: string, pinnedVersion?: string)
   const tmpPath = join(tmpDir, 'binary')
 
   try {
-    const binaryUrl = getBinaryUrl(backendUrl, target, targetVersion)
+    const binaryUrl = getBinaryUrl(binaryUrlPrefix, target, targetVersion)
     log.info(`Downloading binary from ${binaryUrl}`)
     const response = await fetch(binaryUrl)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)

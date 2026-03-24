@@ -5,29 +5,33 @@ const { values } = parseArgs({
   args: process.argv.slice(2),
   options: {
     'port-file': { type: 'string' },
+    'binary-port-file': { type: 'string' },
     'version-status': { type: 'string', default: '200' },
     'binary-status': { type: 'string', default: '200' },
   },
 })
 
 const portFile = values['port-file']
+const binaryPortFile = values['binary-port-file']
 const versionStatus = Number(values['version-status'])
 const binaryStatus = Number(values['binary-status'])
 
-if (!portFile) {
-  console.error('Usage: e2e-error-mock-server.ts --port-file <path> [--version-status <code>] [--binary-status <code>]')
+if (!portFile || !binaryPortFile) {
+  console.error(
+    'Usage: e2e-error-mock-server.ts --port-file <path> --binary-port-file <path> [--version-status <code>] [--binary-status <code>]',
+  )
   process.exit(1)
 }
 
 console.log(`Version endpoint status: ${versionStatus}`)
 console.log(`Binary endpoint status: ${binaryStatus}`)
 
-const server = Bun.serve({
+const versionServer = Bun.serve({
   hostname: '127.0.0.1',
   port: 0,
   fetch(req) {
     const url = new URL(req.url)
-    console.log(`${req.method} ${url.pathname}${url.search}`)
+    console.log(`[version] ${req.method} ${url.pathname}${url.search}`)
 
     if (url.pathname === '/api/v1/mdm/version') {
       if (versionStatus !== 200) {
@@ -39,6 +43,18 @@ const server = Bun.serve({
       return Response.json({ checksums, version: '99.0.0' })
     }
 
+    console.log(`[version] 404: ${url.pathname}`)
+    return new Response('Not Found', { status: 404 })
+  },
+})
+
+const binaryServer = Bun.serve({
+  hostname: '127.0.0.1',
+  port: 0,
+  fetch(req) {
+    const url = new URL(req.url)
+    console.log(`[binary] ${req.method} ${url.pathname}${url.search}`)
+
     if (url.pathname.startsWith('/static/mdm/binaries/')) {
       if (binaryStatus !== 200) {
         return new Response('Simulated error', { status: binaryStatus })
@@ -48,18 +64,20 @@ const server = Bun.serve({
       })
     }
 
-    console.log(`404: ${url.pathname}`)
+    console.log(`[binary] 404: ${url.pathname}`)
     return new Response('Not Found', { status: 404 })
   },
 })
 
-const port = server.port
-console.log(`Listening on port ${port}`)
-writeFileSync(portFile, String(port))
+console.log(`Version server listening on port ${versionServer.port}`)
+console.log(`Binary server listening on port ${binaryServer.port}`)
+writeFileSync(portFile, String(versionServer.port))
+writeFileSync(binaryPortFile, String(binaryServer.port))
 
 function shutdown() {
-  console.log('Shutting down mock server')
-  server.stop()
+  console.log('Shutting down mock servers')
+  versionServer.stop()
+  binaryServer.stop()
   process.exit(0)
 }
 
