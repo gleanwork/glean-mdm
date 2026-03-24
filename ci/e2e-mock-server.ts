@@ -42,7 +42,7 @@ const server = Bun.serve({
       return Response.json({ checksums, version })
     }
 
-    if (url.pathname === '/api/v1/mdm/binary') {
+    if (url.pathname.startsWith('/static/mdm/binaries/')) {
       return new Response(binaryData, {
         headers: { 'Content-Type': 'application/octet-stream' },
       })

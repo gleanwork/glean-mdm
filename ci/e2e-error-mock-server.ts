@@ -39,7 +39,7 @@ const server = Bun.serve({
       return Response.json({ checksums, version: '99.0.0' })
     }
 
-    if (url.pathname === '/api/v1/mdm/binary') {
+    if (url.pathname.startsWith('/static/mdm/binaries/')) {
       if (binaryStatus !== 200) {
         return new Response('Simulated error', { status: binaryStatus })
       }

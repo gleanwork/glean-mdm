@@ -48,6 +48,74 @@ describe('MdmConfigSchema', () => {
 
     expect(result.success).toBe(true)
   })
+
+  describe('autoUpdate', () => {
+    it('defaults to true when not set', () => {
+      const result = MdmConfigSchema.safeParse(VALID_CONFIG)
+
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.autoUpdate).toBe(true)
+    })
+
+    it('accepts explicit true', () => {
+      const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, autoUpdate: true })
+
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.autoUpdate).toBe(true)
+    })
+
+    it('accepts explicit false', () => {
+      const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, autoUpdate: false })
+
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.autoUpdate).toBe(false)
+    })
+
+    it('coerces non-boolean values to true', () => {
+      for (const invalid of ['yes', 123, null]) {
+        const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, autoUpdate: invalid })
+
+        expect(result.success).toBe(true)
+        if (result.success) expect(result.data.autoUpdate).toBe(true)
+      }
+    })
+  })
+
+  describe('pinnedVersion', () => {
+    it('defaults to undefined when not set', () => {
+      const result = MdmConfigSchema.safeParse(VALID_CONFIG)
+
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.pinnedVersion).toBeUndefined()
+    })
+
+    it('accepts valid semver strings', () => {
+      for (const version of ['1.2.3', 'v1.2.3', '0.0.1', 'v10.20.30']) {
+        const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, pinnedVersion: version })
+
+        expect(result.success).toBe(true)
+        if (result.success) expect(result.data.pinnedVersion).toBe(version)
+      }
+    })
+
+    it('ignores invalid semver strings', () => {
+      for (const invalid of ['not-a-version', '1.2', '', '1.2.3.4']) {
+        const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, pinnedVersion: invalid })
+
+        expect(result.success).toBe(true)
+        if (result.success) expect(result.data.pinnedVersion).toBeUndefined()
+      }
+    })
+
+    it('ignores non-string values', () => {
+      for (const invalid of [123, true, null]) {
+        const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, pinnedVersion: invalid })
+
+        expect(result.success).toBe(true)
+        if (result.success) expect(result.data.pinnedVersion).toBeUndefined()
+      }
+    })
+  })
 })
 
 describe('getServerUrl', () => {

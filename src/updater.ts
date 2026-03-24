@@ -24,58 +24,84 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
-export async function checkForUpdate(backendUrl: string): Promise<boolean> {
+export function shouldUpdate(currentVersion: string, serverVersion: string, pinnedVersion?: string): boolean {
+  const targetVersion = pinnedVersion ?? serverVersion
+  return compareVersions(currentVersion, targetVersion) < 0
+}
+
+function getBinaryUrl(backendUrl: string, target: string, version: string): string {
+  const ext = target.startsWith('windows-') ? '.exe' : ''
+  return `${backendUrl}/static/mdm/binaries/${version}/glean-mdm-${target}${ext}`
+}
+
+export async function checkForUpdate(backendUrl: string, pinnedVersion?: string): Promise<boolean> {
   const target = getTargetName()
   const currentPlatform = getPlatform()
 
   log.info(`Checking for updates (current: ${BUILD_VERSION})`)
 
-  let versionInfo: VersionInfo
-  const versionUrl = `${backendUrl}/api/v1/mdm/version`
-  log.info(`Fetching version info from ${versionUrl}`)
-  try {
-    const response = await fetch(versionUrl)
-    if (!response.ok) {
-      const body = await response.text().catch(() => '<no body>')
-      log.warn(`Update check returned HTTP ${response.status}: ${body}`)
+  let targetVersion: string
+  let expectedChecksum: string | undefined
+
+  if (pinnedVersion) {
+    if (compareVersions(BUILD_VERSION, pinnedVersion) >= 0) {
+      log.info(`Already at pinned version (${BUILD_VERSION})`)
       return false
     }
-    versionInfo = (await response.json()) as VersionInfo
-  } catch (err) {
-    log.warn(`Update check failed: ${err}`)
-    log.warn(`Continuing with current version: ${BUILD_VERSION}`)
-    return false
+    targetVersion = pinnedVersion
+  } else {
+    let versionInfo: VersionInfo
+    const versionUrl = `${backendUrl}/api/v1/mdm/version`
+    log.info(`Fetching version info from ${versionUrl}`)
+    try {
+      const response = await fetch(versionUrl)
+      if (!response.ok) {
+        const body = await response.text().catch(() => '<no body>')
+        log.warn(`Update check returned HTTP ${response.status}: ${body}`)
+        return false
+      }
+      versionInfo = (await response.json()) as VersionInfo
+    } catch (err) {
+      log.warn(`Update check failed: ${err}`)
+      log.warn(`Continuing with current version: ${BUILD_VERSION}`)
+      return false
+    }
+
+    if (compareVersions(BUILD_VERSION, versionInfo.version) >= 0) {
+      log.info(`Already up to date (${BUILD_VERSION})`)
+      return false
+    }
+
+    targetVersion = versionInfo.version
+    expectedChecksum = versionInfo.checksums[target]
+    if (!expectedChecksum) {
+      log.error(`No checksum for target ${target}`)
+      return false
+    }
   }
 
-  if (compareVersions(BUILD_VERSION, versionInfo.version) >= 0) {
-    log.info(`Already up to date (${BUILD_VERSION})`)
-    return false
-  }
-
-  log.info(`Update available: ${BUILD_VERSION} → ${versionInfo.version}`)
-
-  const expectedChecksum = versionInfo.checksums[target]
-  if (!expectedChecksum) {
-    log.error(`No checksum for target ${target}`)
-    return false
-  }
+  log.info(`Update available: ${BUILD_VERSION} → ${targetVersion}`)
 
   const binaryPath = getBinaryInstallPath()
   const tmpDir = mkdtempSync(join(dirname(binaryPath), '.glean-mdm-update-'))
   const tmpPath = join(tmpDir, 'binary')
 
   try {
-    const response = await fetch(`${backendUrl}/api/v1/mdm/binary?target=${target}`)
+    const binaryUrl = getBinaryUrl(backendUrl, target, targetVersion)
+    log.info(`Downloading binary from ${binaryUrl}`)
+    const response = await fetch(binaryUrl)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const buffer = Buffer.from(await response.arrayBuffer())
     writeFileSync(tmpPath, buffer, { mode: 0o600 })
 
-    const actualChecksum = `sha256:${createHash('sha256').update(buffer).digest('hex')}`
+    if (expectedChecksum) {
+      const actualChecksum = `sha256:${createHash('sha256').update(buffer).digest('hex')}`
 
-    if (actualChecksum !== expectedChecksum) {
-      log.error(`Checksum mismatch: expected ${expectedChecksum}, got ${actualChecksum}`)
-      rmSync(tmpDir, { force: true, recursive: true })
-      return false
+      if (actualChecksum !== expectedChecksum) {
+        log.error(`Checksum mismatch: expected ${expectedChecksum}, got ${actualChecksum}`)
+        rmSync(tmpDir, { force: true, recursive: true })
+        return false
+      }
     }
 
     if (currentPlatform === 'win32') {
@@ -118,7 +144,7 @@ export async function checkForUpdate(backendUrl: string): Promise<boolean> {
       }
     }
 
-    log.info(`Updated to ${versionInfo.version}, re-executing...`)
+    log.info(`Updated to ${targetVersion}, re-executing...`)
 
     const filteredArgs = process.argv.slice(2).filter((a) => a !== '--skip-update')
     execFileSync(binaryPath, [...filteredArgs, '--skip-update'], {
