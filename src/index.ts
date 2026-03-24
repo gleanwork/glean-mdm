@@ -1,4 +1,4 @@
-import { getBackendUrl, getServerUrl, readMcpConfig, readMdmConfig } from './config.js'
+import { getServerUrl, readMcpConfig, readMdmConfig } from './config.js'
 import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
   }
 
   if (!args.skipUpdate && mdmConfig.autoUpdate) {
-    await checkForUpdate(getBackendUrl(mcpConfig.servers[0].url), mdmConfig.binaryUrlPrefix, mdmConfig.pinnedVersion)
+    await checkForUpdate(mdmConfig.versionUrl!, mdmConfig.binaryUrlPrefix, mdmConfig.pinnedVersion)
   } else if (!mdmConfig.autoUpdate) {
     log.info('Auto-update disabled by configuration')
   }

@@ -34,7 +34,7 @@ function getBinaryUrl(binaryUrlPrefix: string, target: string, version: string):
   return `${binaryUrlPrefix}/${version}/glean-mdm-${target}${ext}`
 }
 
-export async function checkForUpdate(backendUrl: string, binaryUrlPrefix: string, pinnedVersion?: string): Promise<boolean> {
+export async function checkForUpdate(versionUrl: string, binaryUrlPrefix: string, pinnedVersion?: string): Promise<boolean> {
   const target = getTargetName()
   const currentPlatform = getPlatform()
 
@@ -51,7 +51,6 @@ export async function checkForUpdate(backendUrl: string, binaryUrlPrefix: string
     targetVersion = pinnedVersion
   } else {
     let versionInfo: VersionInfo
-    const versionUrl = `${backendUrl}/api/v1/mdm/version`
     log.info(`Fetching version info from ${versionUrl}`)
     try {
       const response = await fetch(versionUrl)

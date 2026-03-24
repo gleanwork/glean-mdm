@@ -59,9 +59,19 @@ Or specify custom paths with `--mcp-config` and `--mdm-config`.
 
 ```json
 {
-  "binaryUrlPrefix": "https://app.glean.com/static/mdm/binaries"
+  "autoUpdate": true,
+  "versionUrl": "https://your-company-be.glean.com/api/v1/mdm/version",
+  "binaryUrlPrefix": "https://app.glean.com/static/mdm/binaries",
+  "pinnedVersion": "1.2.3"
 }
 ```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `autoUpdate` | boolean | yes | Enable automatic binary updates |
+| `versionUrl` | string (URL) | if `autoUpdate` is true | URL to fetch latest version info |
+| `binaryUrlPrefix` | string (URL) | yes | Base URL for downloading binaries |
+| `pinnedVersion` | string (semver) | no | Pin to a specific version (e.g. `1.2.3` or `v1.2.3`) |
 
 ## Development
 

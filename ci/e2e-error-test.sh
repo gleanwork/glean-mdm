@@ -114,7 +114,7 @@ run_and_check() {
 {"serverName":"e2e_test","url":"http://127.0.0.1:${port}/mcp/default"}
 EOF
   cat > "$MDM_CONFIG_FILE" <<EOF
-{"binaryUrlPrefix":"http://127.0.0.1:${binary_port}/static/mdm/binaries"}
+{"autoUpdate":true,"versionUrl":"http://127.0.0.1:${port}/api/v1/mdm/version","binaryUrlPrefix":"http://127.0.0.1:${binary_port}/static/mdm/binaries"}
 EOF
 
   "$INSTALL_PATH" --dry-run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {

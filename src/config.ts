@@ -15,17 +15,23 @@ export const McpConfigSchema = z
   .union([z.array(McpServerEntrySchema).min(1), McpServerEntrySchema])
   .transform((val) => (Array.isArray(val) ? val : [val]))
 
-export const MdmConfigSchema = z.object({
-  autoUpdate: z.preprocess((val) => (typeof val === 'boolean' ? val : true), z.boolean()),
-  pinnedVersion: z.preprocess(
-    (val) => (typeof val === 'string' && SEMVER_PATTERN.test(val) ? val : undefined),
-    z.string().optional(),
-  ),
-  binaryUrlPrefix: z.preprocess(
-    (val) => (typeof val === 'string' && val.length > 0 ? val.replace(/\/+$/, '') : val),
-    z.string().url(),
-  ),
-})
+export const MdmConfigSchema = z
+  .object({
+    autoUpdate: z.boolean(),
+    versionUrl: z.string().url().optional(),
+    pinnedVersion: z.preprocess(
+      (val) => (typeof val === 'string' && SEMVER_PATTERN.test(val) ? val : undefined),
+      z.string().optional(),
+    ),
+    binaryUrlPrefix: z.preprocess(
+      (val) => (typeof val === 'string' && val.length > 0 ? val.replace(/\/+$/, '') : val),
+      z.string().url(),
+    ),
+  })
+  .refine((data) => !data.autoUpdate || data.versionUrl !== undefined, {
+    message: 'versionUrl is required when autoUpdate is true',
+    path: ['versionUrl'],
+  })
 
 export type McpServerEntry = z.infer<typeof McpServerEntrySchema>
 export type McpConfig = { servers: McpServerEntry[] }

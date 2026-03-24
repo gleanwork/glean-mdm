@@ -107,7 +107,7 @@ cat > "$MCP_CONFIG_FILE" <<EOF
 {"serverName":"e2e_test","url":"http://127.0.0.1:${PORT}/mcp/default"}
 EOF
 cat > "$MDM_CONFIG_FILE" <<EOF
-{"binaryUrlPrefix":"http://127.0.0.1:${BINARY_PORT}/static/mdm/binaries"}
+{"autoUpdate":true,"versionUrl":"http://127.0.0.1:${PORT}/api/v1/mdm/version","binaryUrlPrefix":"http://127.0.0.1:${BINARY_PORT}/static/mdm/binaries"}
 EOF
 echo "MCP config: $(cat "$MCP_CONFIG_FILE")"
 echo "MDM config: $(cat "$MDM_CONFIG_FILE")"
