@@ -35,9 +35,16 @@ esac
 
 CREATED_FILES=()
 
+# Use sha256sum on Windows (Git Bash), shasum elsewhere
+if command -v shasum > /dev/null 2>&1; then
+  hash_cmd() { shasum -a 256 "$1"; }
+else
+  hash_cmd() { sha256sum "$1"; }
+fi
+
 cleanup() {
   echo "=== Cleanup ==="
-  for f in "${CREATED_FILES[@]}"; do
+  for f in "${CREATED_FILES[@]+"${CREATED_FILES[@]}"}"; do
     rm -f "$f" 2>/dev/null || true
     # Remove parent dirs if empty up to HOME
     local dir
@@ -104,7 +111,7 @@ echo ""
 echo "=== Discover created config files ==="
 while IFS= read -r line; do
   CREATED_FILES+=("$line")
-done < <(tr -d '\r' < "$RUN_OUTPUT" | sed -n 's/.*Configured \(JSON\|TOML\|YAML\): //p')
+done < <(tr -d '\r' < "$RUN_OUTPUT" | grep -E 'Configured (JSON|TOML|YAML): ' | sed 's/.*Configured [A-Z]*: //')
 
 echo "Found ${#CREATED_FILES[@]} configured file(s)"
 for f in "${CREATED_FILES[@]}"; do
@@ -156,7 +163,7 @@ for f in "${CREATED_FILES[@]}"; do
 done
 
 for f in "${!UNIQUE_FILES[@]}"; do
-  shasum -a 256 "$f"
+  hash_cmd "$f"
 done | sort > "$CHECKSUMS_RUN1"
 cat "$CHECKSUMS_RUN1"
 
@@ -175,7 +182,7 @@ tr -d '\r' < "$RUN_OUTPUT"
 echo ""
 echo "=== Compute Run 2 checksums ==="
 for f in "${!UNIQUE_FILES[@]}"; do
-  shasum -a 256 "$f"
+  hash_cmd "$f"
 done | sort > "$CHECKSUMS_RUN2"
 cat "$CHECKSUMS_RUN2"
 
