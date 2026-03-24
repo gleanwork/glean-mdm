@@ -43,6 +43,11 @@ function installMacOSSchedule(): void {
 </plist>`
 
   writeFileSync(MACOS_PLIST_PATH, plist)
+  try {
+    execSync(`launchctl bootout system "${MACOS_PLIST_PATH}"`, { stdio: 'ignore' })
+  } catch {
+    // May not be loaded
+  }
   execSync(`launchctl bootstrap system "${MACOS_PLIST_PATH}"`)
   log.info('Installed macOS LaunchDaemon schedule')
 }

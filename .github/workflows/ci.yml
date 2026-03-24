@@ -148,3 +148,37 @@ jobs:
             --outfile dist/glean-mdm${{ matrix.ext }}
       - name: Run E2E config creation test
         run: ci/e2e-config-test.sh dist/glean-mdm${{ matrix.ext }}
+
+  e2e-schedule:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            ext: ""
+          - os: macos-latest
+            target: bun-darwin-arm64
+            ext: ""
+          - os: windows-latest
+            target: bun-windows-x64
+            ext: ".exe"
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - name: Build binary
+        run: |
+          bun build src/index.ts \
+            --compile \
+            --target=${{ matrix.target }} \
+            --define "process.env.BUILD_VERSION=\"0.1.0\"" \
+            --outfile dist/glean-mdm${{ matrix.ext }}
+      - name: Run E2E schedule test
+        run: ci/e2e-schedule-test.sh dist/glean-mdm${{ matrix.ext }}
