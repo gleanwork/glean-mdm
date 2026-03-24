@@ -1,4 +1,5 @@
 {
   "serverName": "glean_ci_smoke",
-  "url": "https://example.invalid/mcp/default"
+  "url": "https://example.invalid/mcp/default",
+  "binaryUrlPrefix": "https://example.invalid/static/mdm/binaries"
 }

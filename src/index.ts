@@ -83,7 +83,7 @@ async function main(): Promise<void> {
   log.info(`Server: ${config.serverName} (${getServerUrl(config)})`)
 
   if (!args.skipUpdate && config.autoUpdate) {
-    await checkForUpdate(getBackendUrl(config.url), config.pinnedVersion)
+    await checkForUpdate(getBackendUrl(config.url), config.binaryUrlPrefix, config.pinnedVersion)
   } else if (!config.autoUpdate) {
     log.info('Auto-update disabled by configuration')
   }

@@ -5,6 +5,7 @@ OLD_BINARY="${1:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 NEW_BINARY="${2:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 
 PORT_FILE="$(mktemp)"
+BINARY_PORT_FILE="$(mktemp)"
 CONFIG_FILE="$(mktemp)"
 RUN_OUTPUT="$(mktemp)"
 MOCK_PID=""
@@ -36,7 +37,7 @@ esac
 cleanup() {
   echo "=== Cleanup ==="
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null || true
-  rm -f "$PORT_FILE" "$CONFIG_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
+  rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$CONFIG_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
   rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
   case "$(uname -s)" in
     Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
@@ -70,24 +71,27 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 bun "$SCRIPT_DIR/e2e-mock-server.ts" \
   --binary-path "$NEW_BINARY" \
   --version 99.0.0 \
-  --port-file "$PORT_FILE" &
+  --port-file "$PORT_FILE" \
+  --binary-port-file "$BINARY_PORT_FILE" &
 MOCK_PID=$!
 
-# Wait for the port file to be written
+# Wait for the port files to be written
 for i in $(seq 1 30); do
-  if [ -s "$PORT_FILE" ]; then
+  if [ -s "$PORT_FILE" ] && [ -s "$BINARY_PORT_FILE" ]; then
     break
   fi
   sleep 0.1
 done
 
-if [ ! -s "$PORT_FILE" ]; then
+if [ ! -s "$PORT_FILE" ] || [ ! -s "$BINARY_PORT_FILE" ]; then
   echo "FAIL: Mock server did not start (no port file after 3s)"
   exit 1
 fi
 
 PORT=$(cat "$PORT_FILE")
-echo "Mock server on port $PORT"
+BINARY_PORT=$(cat "$BINARY_PORT_FILE")
+echo "Version server on port $PORT"
+echo "Binary server on port $BINARY_PORT"
 
 # Sanity-check the mock server
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT}/api/v1/mdm/version")
@@ -99,7 +103,7 @@ echo "Mock server health check OK"
 
 echo "=== Create test config ==="
 cat > "$CONFIG_FILE" <<EOF
-{"serverName":"e2e_test","url":"http://127.0.0.1:${PORT}/mcp/default"}
+{"serverName":"e2e_test","url":"http://127.0.0.1:${PORT}/mcp/default","binaryUrlPrefix":"http://127.0.0.1:${BINARY_PORT}/static/mdm/binaries"}
 EOF
 echo "Config: $(cat "$CONFIG_FILE")"
 
