@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { createGleanRegistry } from '@gleanwork/mcp-config-glean'
 
 import { getServerUrl } from '../config.js'
-import type { MdmConfig } from '../config.js'
+import type { McpServerEntry } from '../config.js'
 import { log } from '../logger.js'
 import { getPlatform } from '../platform.js'
 
@@ -13,7 +13,7 @@ import { configureTomlFile } from './toml-configurator.js'
 import { configureYamlFile } from './yaml-configurator.js'
 
 export interface ConfigureHostsOptions {
-  config: MdmConfig
+  servers: McpServerEntry[]
   dryRun?: boolean
   gid?: number
   uid?: number
@@ -47,10 +47,28 @@ function chownAncestors(filePath: string, stopAt: string, uid: number, gid: numb
   }
 }
 
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val)
+}
+
+function deepMergeServerConfigs(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...target }
+  for (const [key, value] of Object.entries(source)) {
+    if (isPlainObject(value) && isPlainObject(result[key])) {
+      result[key] = { ...(result[key] as Record<string, unknown>), ...(value as Record<string, unknown>) }
+    } else {
+      result[key] = value
+    }
+  }
+  return result
+}
+
 export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[] {
-  const { config, dryRun, gid, uid, userHomeDir } = options
+  const { servers, dryRun, gid, uid, userHomeDir } = options
   const currentPlatform = getPlatform()
-  const serverUrl = getServerUrl(config)
   const registry = createGleanRegistry()
   const clients = registry.getClientsByPlatform(currentPlatform)
   const results: ConfigureResult[] = []
@@ -69,27 +87,32 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
 
     try {
       const builder = registry.createBuilder(client.id)
-      const generatedConfig = builder.buildConfiguration({
-        headers: { 'X-Glean-Metadata': 'mdm' },
-        includeRootObject: true,
-        serverName: config.serverName,
-        serverUrl,
-        transport: 'http',
-      })
+
+      let mergedConfig: Record<string, unknown> = {}
+      for (const server of servers) {
+        const serverUrl = getServerUrl(server)
+        const generatedConfig = builder.buildConfiguration({
+          headers: { 'X-Glean-Metadata': 'mdm' },
+          includeRootObject: true,
+          serverName: server.serverName,
+          serverUrl,
+          transport: 'http',
+        }) as unknown as Record<string, unknown>
+
+        mergedConfig = deepMergeServerConfigs(mergedConfig, generatedConfig)
+      }
 
       mkdirSync(dirname(resolvedPath), { recursive: true })
 
-      const configToMerge = generatedConfig as unknown as Record<string, unknown>
-
       switch (client.configFormat) {
         case 'json':
-          configureJsonFile({ configToMerge, filePath: resolvedPath })
+          configureJsonFile({ configToMerge: mergedConfig, filePath: resolvedPath })
           break
         case 'toml':
-          configureTomlFile({ configToMerge, filePath: resolvedPath })
+          configureTomlFile({ configToMerge: mergedConfig, filePath: resolvedPath })
           break
         case 'yaml':
-          configureYamlFile({ configToMerge, filePath: resolvedPath })
+          configureYamlFile({ configToMerge: mergedConfig, filePath: resolvedPath })
           break
         default:
           throw new Error(`Unsupported config format: ${client.configFormat}`)

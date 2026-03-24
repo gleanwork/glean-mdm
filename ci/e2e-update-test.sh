@@ -6,7 +6,8 @@ NEW_BINARY="${2:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 
 PORT_FILE="$(mktemp)"
 BINARY_PORT_FILE="$(mktemp)"
-CONFIG_FILE="$(mktemp)"
+MCP_CONFIG_FILE="$(mktemp)"
+MDM_CONFIG_FILE="$(mktemp)"
 RUN_OUTPUT="$(mktemp)"
 MOCK_PID=""
 
@@ -37,7 +38,7 @@ esac
 cleanup() {
   echo "=== Cleanup ==="
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null || true
-  rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$CONFIG_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
+  rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$MCP_CONFIG_FILE" "$MDM_CONFIG_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
   rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
   case "$(uname -s)" in
     Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
@@ -101,14 +102,18 @@ if [ "$HTTP_CODE" != "200" ]; then
 fi
 echo "Mock server health check OK"
 
-echo "=== Create test config ==="
-cat > "$CONFIG_FILE" <<EOF
-{"serverName":"e2e_test","url":"http://127.0.0.1:${PORT}/mcp/default","binaryUrlPrefix":"http://127.0.0.1:${BINARY_PORT}/static/mdm/binaries"}
+echo "=== Create test configs ==="
+cat > "$MCP_CONFIG_FILE" <<EOF
+{"serverName":"e2e_test","url":"http://127.0.0.1:${PORT}/mcp/default"}
 EOF
-echo "Config: $(cat "$CONFIG_FILE")"
+cat > "$MDM_CONFIG_FILE" <<EOF
+{"binaryUrlPrefix":"http://127.0.0.1:${BINARY_PORT}/static/mdm/binaries"}
+EOF
+echo "MCP config: $(cat "$MCP_CONFIG_FILE")"
+echo "MDM config: $(cat "$MDM_CONFIG_FILE")"
 
 echo "=== Run old binary (triggers update) ==="
-"$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
+"$INSTALL_PATH" --dry-run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Binary exited with code $EXIT_CODE"
   echo "=== Output ==="
@@ -132,7 +137,7 @@ if [ "$INSTALLED_VERSION" != "99.0.0" ]; then
 fi
 
 echo "=== Run new binary again (should not update) ==="
-"$INSTALL_PATH" --dry-run --config "$CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
+"$INSTALL_PATH" --dry-run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Second run exited with code $EXIT_CODE"
   tr -d '\r' < "$RUN_OUTPUT"
