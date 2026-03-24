@@ -44,12 +44,46 @@ Place `mcp-config.json` at the platform-specific default path:
 
 Or specify a custom path with `--config /path/to/config.json`.
 
+The config file can contain a single server object or an array of server objects:
+
+**Single server:**
+
 ```json
 {
   "serverName": "glean_default",
-  "url": "https://your-company-be.glean.com/mcp/default"
+  "url": "https://your-company-be.glean.com/mcp/default",
+  "binaryUrlPrefix": "https://app.glean.com/static/mdm/binaries"
 }
 ```
+
+**Multiple servers:**
+
+```json
+[
+  {
+    "serverName": "glean_default",
+    "url": "https://your-company-be.glean.com/mcp/default",
+    "binaryUrlPrefix": "https://app.glean.com/static/mdm/binaries"
+  },
+  {
+    "serverName": "glean_secondary",
+    "url": "https://your-company-be.glean.com/mcp/secondary",
+    "binaryUrlPrefix": "https://app.glean.com/static/mdm/binaries"
+  }
+]
+```
+
+Each server object supports the following properties:
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `serverName` | Yes | Name for the MCP server entry in host configs |
+| `url` | Yes | Full URL to the Glean MCP server endpoint |
+| `binaryUrlPrefix` | Yes | Base URL for downloading binary updates |
+| `autoUpdate` | No | Enable/disable auto-updates (default: `true`) |
+| `pinnedVersion` | No | Pin to a specific semver version (e.g. `"1.2.3"` or `"v1.2.3"`) |
+
+When multiple servers are configured, each host application will be configured with all server entries. Auto-update uses the first server entry in the array.
 
 ## Development
 

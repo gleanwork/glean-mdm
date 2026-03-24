@@ -1,6 +1,14 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-import { getBackendUrl, getServerUrl, MdmConfigSchema } from './config'
+import { getBackendUrl, getServerUrl, MdmConfigSchema, readMdmConfig } from './config'
+
+vi.mock('node:fs', () => ({
+  readFileSync: vi.fn(),
+}))
+
+vi.mock('./platform.js', () => ({
+  getDefaultConfigPath: () => '/mock/config.json',
+}))
 
 describe('MdmConfigSchema', () => {
   const VALID_CONFIG = {
@@ -164,6 +172,8 @@ describe('getServerUrl', () => {
       getServerUrl({
         serverName: 'glean_default',
         url: 'https://customer-be.glean.com/mcp/default',
+        autoUpdate: true,
+        binaryUrlPrefix: 'https://app.glean.com/static/mdm/binaries',
       }),
     ).toBe('https://customer-be.glean.com/mcp/default')
   })
@@ -180,5 +190,58 @@ describe('getBackendUrl', () => {
 
   it('returns the URL unchanged if no /mcp/ path present', () => {
     expect(getBackendUrl('https://customer-be.glean.com')).toBe('https://customer-be.glean.com')
+  })
+})
+
+describe('readMdmConfig', () => {
+  const VALID_CONFIG = {
+    serverName: 'glean_default',
+    url: 'https://customer-be.glean.com/mcp/default',
+    binaryUrlPrefix: 'https://app.glean.com/static/mdm/binaries',
+  }
+
+  const SECOND_CONFIG = {
+    serverName: 'glean_secondary',
+    url: 'https://other-be.glean.com/mcp/default',
+    binaryUrlPrefix: 'https://app.glean.com/static/mdm/binaries',
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('wraps a single config object in an array', async () => {
+    const { readFileSync } = await import('node:fs')
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(VALID_CONFIG))
+
+    const result = readMdmConfig('/some/path.json')
+
+    expect(result).toHaveLength(1)
+    expect(result[0].serverName).toBe('glean_default')
+  })
+
+  it('accepts an array of configs', async () => {
+    const { readFileSync } = await import('node:fs')
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify([VALID_CONFIG, SECOND_CONFIG]))
+
+    const result = readMdmConfig('/some/path.json')
+
+    expect(result).toHaveLength(2)
+    expect(result[0].serverName).toBe('glean_default')
+    expect(result[1].serverName).toBe('glean_secondary')
+  })
+
+  it('rejects an empty array', async () => {
+    const { readFileSync } = await import('node:fs')
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify([]))
+
+    expect(() => readMdmConfig('/some/path.json')).toThrow()
+  })
+
+  it('rejects an array with invalid entries', async () => {
+    const { readFileSync } = await import('node:fs')
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify([{ serverName: 'x' }]))
+
+    expect(() => readMdmConfig('/some/path.json')).toThrow()
   })
 })

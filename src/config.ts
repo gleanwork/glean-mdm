@@ -22,11 +22,14 @@ export const MdmConfigSchema = z.object({
 
 export type MdmConfig = z.infer<typeof MdmConfigSchema>
 
-export function readMdmConfig(configPath?: string): MdmConfig {
+const MdmConfigFileSchema = z.union([MdmConfigSchema, z.array(MdmConfigSchema).min(1)])
+
+export function readMdmConfig(configPath?: string): MdmConfig[] {
   const path = configPath ?? getDefaultConfigPath()
   const raw = readFileSync(path, 'utf-8')
   const json = JSON.parse(raw)
-  return MdmConfigSchema.parse(json)
+  const parsed = MdmConfigFileSchema.parse(json)
+  return Array.isArray(parsed) ? parsed : [parsed]
 }
 
 export function getServerUrl(config: MdmConfig): string {

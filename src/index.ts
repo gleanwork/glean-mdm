@@ -79,12 +79,13 @@ async function main(): Promise<void> {
     return
   }
 
-  const config = readMdmConfig(args.configPath)
-  log.info(`Server: ${config.serverName} (${getServerUrl(config)})`)
+  const configs = readMdmConfig(args.configPath)
 
-  if (!args.skipUpdate && config.autoUpdate) {
-    await checkForUpdate(getBackendUrl(config.url), config.binaryUrlPrefix, config.pinnedVersion)
-  } else if (!config.autoUpdate) {
+  // Run auto-update using the first config entry
+  const primaryConfig = configs[0]
+  if (!args.skipUpdate && primaryConfig.autoUpdate) {
+    await checkForUpdate(getBackendUrl(primaryConfig.url), primaryConfig.binaryUrlPrefix, primaryConfig.pinnedVersion)
+  } else if (!primaryConfig.autoUpdate) {
     log.info('Auto-update disabled by configuration')
   }
 
@@ -100,26 +101,30 @@ async function main(): Promise<void> {
     users = enumerateUsers()
   }
 
-  log.info(`Found ${users.length} user(s)`)
+  log.info(`Found ${users.length} user(s), ${configs.length} server(s)`)
 
   let totalSuccess = 0
   let totalFailure = 0
 
-  for (const user of users) {
-    log.info(`Configuring hosts for ${user.username} (${user.homeDir})`)
+  for (const config of configs) {
+    log.info(`Server: ${config.serverName} (${getServerUrl(config)})`)
 
-    const results = configureHosts({
-      config,
-      dryRun: args.dryRun,
-      gid: user.gid,
-      uid: user.uid,
-      userHomeDir: user.homeDir,
-      username: user.username,
-    })
+    for (const user of users) {
+      log.info(`Configuring hosts for ${user.username} (${user.homeDir})`)
 
-    for (const result of results) {
-      if (result.success) totalSuccess++
-      else totalFailure++
+      const results = configureHosts({
+        config,
+        dryRun: args.dryRun,
+        gid: user.gid,
+        uid: user.uid,
+        userHomeDir: user.homeDir,
+        username: user.username,
+      })
+
+      for (const result of results) {
+        if (result.success) totalSuccess++
+        else totalFailure++
+      }
     }
   }
 
