@@ -4,9 +4,16 @@ import { z } from 'zod'
 
 import { getDefaultConfigPath } from './platform.js'
 
+const SEMVER_PATTERN = /^v?\d+\.\d+\.\d+$/
+
 export const MdmConfigSchema = z.object({
   serverName: z.string().min(1),
   url: z.string().min(1),
+  autoUpdate: z.preprocess((val) => (typeof val === 'boolean' ? val : true), z.boolean()),
+  pinnedVersion: z.preprocess(
+    (val) => (typeof val === 'string' && SEMVER_PATTERN.test(val) ? val : undefined),
+    z.string().optional(),
+  ),
 })
 
 export type MdmConfig = z.infer<typeof MdmConfigSchema>

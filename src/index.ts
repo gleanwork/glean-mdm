@@ -82,8 +82,10 @@ async function main(): Promise<void> {
   const config = readMdmConfig(args.configPath)
   log.info(`Server: ${config.serverName} (${getServerUrl(config)})`)
 
-  if (!args.skipUpdate) {
-    await checkForUpdate(getBackendUrl(config.url))
+  if (!args.skipUpdate && config.autoUpdate) {
+    await checkForUpdate(getBackendUrl(config.url), config.pinnedVersion)
+  } else if (!config.autoUpdate) {
+    log.info('Auto-update disabled by configuration')
   }
 
   let users
