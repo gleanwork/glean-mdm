@@ -55,7 +55,7 @@ cleanup() {
     done
   done
 
-  rm -f "$MCP_CONFIG_FILE" "$MDM_CONFIG_FILE" "$RUN_OUTPUT" "$CHECKSUMS_RUN1" "$CHECKSUMS_RUN2" "$INSTALL_PATH"
+  rm -f "$MCP_CONFIG_FILE" "$MDM_CONFIG_FILE" "$RUN_OUTPUT" "$CHECKSUMS_RUN1" "$CHECKSUMS_RUN2" "${UNIQUE_FILES_FILE:-}" "$INSTALL_PATH"
   rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
   case "$(uname -s)" in
     Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
@@ -157,14 +157,12 @@ fi
 echo ""
 echo "=== Compute Run 1 checksums ==="
 # Deduplicate paths (e.g. cursor and cursor-agent share the same file)
-declare -A UNIQUE_FILES
-for f in "${CREATED_FILES[@]}"; do
-  UNIQUE_FILES["$f"]=1
-done
+UNIQUE_FILES_FILE="$(mktemp)"
+printf '%s\n' "${CREATED_FILES[@]}" | sort -u > "$UNIQUE_FILES_FILE"
 
-for f in "${!UNIQUE_FILES[@]}"; do
+while IFS= read -r f; do
   hash_cmd "$f"
-done | sort > "$CHECKSUMS_RUN1"
+done < "$UNIQUE_FILES_FILE" | sort > "$CHECKSUMS_RUN1"
 cat "$CHECKSUMS_RUN1"
 
 echo ""
@@ -181,9 +179,9 @@ tr -d '\r' < "$RUN_OUTPUT"
 
 echo ""
 echo "=== Compute Run 2 checksums ==="
-for f in "${!UNIQUE_FILES[@]}"; do
+while IFS= read -r f; do
   hash_cmd "$f"
-done | sort > "$CHECKSUMS_RUN2"
+done < "$UNIQUE_FILES_FILE" | sort > "$CHECKSUMS_RUN2"
 cat "$CHECKSUMS_RUN2"
 
 if diff -q "$CHECKSUMS_RUN1" "$CHECKSUMS_RUN2" > /dev/null 2>&1; then
