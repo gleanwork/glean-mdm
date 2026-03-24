@@ -25,8 +25,12 @@ describe('parseArgs', () => {
     expect(parseArgs(['--skip-update']).skipUpdate).toBe(true)
   })
 
-  it('parses --config with path', () => {
-    expect(parseArgs(['--config', '/custom/path.json']).configPath).toBe('/custom/path.json')
+  it('parses --mcp-config with path', () => {
+    expect(parseArgs(['--mcp-config', '/custom/mcp.json']).mcpConfigPath).toBe('/custom/mcp.json')
+  })
+
+  it('parses --mdm-config with path', () => {
+    expect(parseArgs(['--mdm-config', '/custom/mdm.json']).mdmConfigPath).toBe('/custom/mdm.json')
   })
 
   it('parses --user with username', () => {
@@ -46,11 +50,21 @@ describe('parseArgs', () => {
   })
 
   it('parses multiple flags together', () => {
-    const result = parseArgs(['--dry-run', '--skip-update', '--config', '/etc/config.json', '--user', 'bob'])
+    const result = parseArgs([
+      '--dry-run',
+      '--skip-update',
+      '--mcp-config',
+      '/etc/mcp.json',
+      '--mdm-config',
+      '/etc/mdm.json',
+      '--user',
+      'bob',
+    ])
 
     expect(result.dryRun).toBe(true)
     expect(result.skipUpdate).toBe(true)
-    expect(result.configPath).toBe('/etc/config.json')
+    expect(result.mcpConfigPath).toBe('/etc/mcp.json')
+    expect(result.mdmConfigPath).toBe('/etc/mdm.json')
     expect(result.singleUser).toBe('bob')
   })
 

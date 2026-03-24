@@ -6,7 +6,7 @@ A CLI tool for IT/MDM administrators to automatically configure MCP (Model Conte
 
 `glean-mdm` runs as a system-level process (via launchd, systemd, or Task Scheduler) and ensures every user on a machine has their AI coding tools configured to connect to the organization's Glean MCP server. It:
 
-1. **Reads a central config** (`mcp-config.json`) specifying the Glean server name and URL
+1. **Reads central configs** (`mcp-config.json` for server definitions, `mdm-config.json` for tool behavior)
 2. **Enumerates local users** on the machine (macOS, Linux, or Windows)
 3. **Configures each supported host application** by merging the Glean MCP server entry into each tool's config file (JSON, TOML, or YAML), preserving any existing settings
 4. **Self-updates** by checking the backend for newer versions before each run
@@ -34,22 +34,44 @@ glean-mdm uninstall-schedule
 
 ### Configuration
 
-Place `mcp-config.json` at the platform-specific default path:
+Place config files at the platform-specific default paths:
 
-| Platform | Path |
-|----------|------|
-| macOS    | `/Library/Application Support/Glean MDM/mcp-config.json` |
-| Linux    | `/etc/glean_mdm/mcp-config.json` |
-| Windows  | `C:\ProgramData\Glean MDM\mcp-config.json` |
+| Platform | MCP Config | MDM Config |
+|----------|------------|------------|
+| macOS    | `/Library/Application Support/Glean MDM/mcp-config.json` | `/Library/Application Support/Glean MDM/mdm-config.json` |
+| Linux    | `/etc/glean_mdm/mcp-config.json` | `/etc/glean_mdm/mdm-config.json` |
+| Windows  | `C:\ProgramData\Glean MDM\mcp-config.json` | `C:\ProgramData\Glean MDM\mdm-config.json` |
 
-Or specify a custom path with `--config /path/to/config.json`.
+Or specify custom paths with `--mcp-config` and `--mdm-config`.
+
+**mcp-config.json** — defines MCP servers (single object or array):
+
+```json
+[
+  {
+    "serverName": "glean_default",
+    "url": "https://your-company-be.glean.com/mcp/default"
+  }
+]
+```
+
+**mdm-config.json** — controls MDM tool behavior:
 
 ```json
 {
-  "serverName": "glean_default",
-  "url": "https://your-company-be.glean.com/mcp/default"
+  "autoUpdate": true,
+  "versionUrl": "https://your-company-be.glean.com/api/v1/mdm/version",
+  "binaryUrlPrefix": "https://app.glean.com/static/mdm/binaries",
+  "pinnedVersion": "1.2.3"
 }
 ```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `autoUpdate` | boolean | yes | Enable automatic binary updates |
+| `versionUrl` | string (URL) | if `autoUpdate` is true | URL to fetch latest version info |
+| `binaryUrlPrefix` | string (URL) | yes | Base URL for downloading binaries |
+| `pinnedVersion` | string (semver) | no | Pin to a specific version (e.g. `1.2.3` or `v1.2.3`) |
 
 ## Development
 
@@ -62,7 +84,7 @@ bunx vitest run
 
 # Run locally
 bun run src/index.ts -- --version
-bun run src/index.ts -- --dry-run --config ci/smoke-dry-run-config.json --user $(whoami)
+bun run src/index.ts -- --dry-run --mcp-config ci/smoke-dry-run-mcp-config.json --mdm-config ci/smoke-dry-run-mdm-config.json --user $(whoami)
 
 # Build binaries for all platforms
 ./build.sh

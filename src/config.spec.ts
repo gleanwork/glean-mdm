@@ -1,11 +1,65 @@
 import { describe, it, expect } from 'vitest'
 
-import { getBackendUrl, getServerUrl, MdmConfigSchema } from './config'
+import { getServerUrl, McpConfigSchema, MdmConfigSchema } from './config'
+
+describe('McpConfigSchema', () => {
+  it('accepts a single server object and normalizes to array', () => {
+    const result = McpConfigSchema.safeParse({ serverName: 'glean_default', url: 'https://example.com/mcp/default' })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data).toEqual([{ serverName: 'glean_default', url: 'https://example.com/mcp/default' }])
+    }
+  })
+
+  it('accepts an array of server objects', () => {
+    const result = McpConfigSchema.safeParse([
+      { serverName: 'server1', url: 'https://one.example.com/mcp/default' },
+      { serverName: 'server2', url: 'https://two.example.com/mcp/default' },
+    ])
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data).toHaveLength(2)
+      expect(result.data[0].serverName).toBe('server1')
+      expect(result.data[1].serverName).toBe('server2')
+    }
+  })
+
+  it('rejects an empty array', () => {
+    expect(McpConfigSchema.safeParse([]).success).toBe(false)
+  })
+
+  it('rejects missing required fields', () => {
+    expect(McpConfigSchema.safeParse({}).success).toBe(false)
+    expect(McpConfigSchema.safeParse({ serverName: 'x' }).success).toBe(false)
+    expect(McpConfigSchema.safeParse({ url: 'https://example.com/mcp/default' }).success).toBe(false)
+  })
+
+  it('rejects empty strings', () => {
+    expect(McpConfigSchema.safeParse({ serverName: '', url: 'https://example.com/mcp/default' }).success).toBe(false)
+    expect(McpConfigSchema.safeParse({ serverName: 'x', url: '' }).success).toBe(false)
+  })
+
+  it('rejects array entries with missing fields', () => {
+    expect(McpConfigSchema.safeParse([{ serverName: 'x' }]).success).toBe(false)
+  })
+
+  it('accepts configs with extra fields (forward compatibility)', () => {
+    const result = McpConfigSchema.safeParse({
+      serverName: 'glean_default',
+      url: 'https://example.com/mcp/default',
+      someNewField: 'future-value',
+    })
+
+    expect(result.success).toBe(true)
+  })
+})
 
 describe('MdmConfigSchema', () => {
   const VALID_CONFIG = {
-    serverName: 'glean_default',
-    url: 'https://customer-be.glean.com/mcp/default',
+    autoUpdate: true,
+    versionUrl: 'https://customer-be.glean.com/api/v1/mdm/version',
     binaryUrlPrefix: 'https://app.glean.com/static/mdm/binaries',
   }
 
@@ -13,32 +67,6 @@ describe('MdmConfigSchema', () => {
     const result = MdmConfigSchema.safeParse(VALID_CONFIG)
 
     expect(result.success).toBe(true)
-  })
-
-  it('config shape remains stable (regression guard)', () => {
-    const result = MdmConfigSchema.safeParse(VALID_CONFIG)
-
-    expect(result.success).toBe(true)
-
-    if (result.success) {
-      expect(result.data.serverName).toBe('glean_default')
-      expect(result.data.url).toBe('https://customer-be.glean.com/mcp/default')
-    }
-  })
-
-  it('rejects missing required fields', () => {
-    expect(MdmConfigSchema.safeParse({}).success).toBe(false)
-    expect(MdmConfigSchema.safeParse({ serverName: 'x' }).success).toBe(false)
-    expect(MdmConfigSchema.safeParse({ url: 'https://example.com/mcp/default' }).success).toBe(false)
-  })
-
-  it('rejects empty strings', () => {
-    expect(
-      MdmConfigSchema.safeParse({
-        ...VALID_CONFIG,
-        serverName: '',
-      }).success,
-    ).toBe(false)
   })
 
   it('accepts configs with extra fields (forward compatibility)', () => {
@@ -51,34 +79,58 @@ describe('MdmConfigSchema', () => {
   })
 
   describe('autoUpdate', () => {
-    it('defaults to true when not set', () => {
+    it('accepts explicit true', () => {
       const result = MdmConfigSchema.safeParse(VALID_CONFIG)
 
       expect(result.success).toBe(true)
       if (result.success) expect(result.data.autoUpdate).toBe(true)
     })
 
-    it('accepts explicit true', () => {
-      const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, autoUpdate: true })
-
-      expect(result.success).toBe(true)
-      if (result.success) expect(result.data.autoUpdate).toBe(true)
-    })
-
     it('accepts explicit false', () => {
-      const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, autoUpdate: false })
+      const { versionUrl: _, ...configWithoutVersionUrl } = VALID_CONFIG
+      const result = MdmConfigSchema.safeParse({ ...configWithoutVersionUrl, autoUpdate: false })
 
       expect(result.success).toBe(true)
       if (result.success) expect(result.data.autoUpdate).toBe(false)
     })
 
-    it('coerces non-boolean values to true', () => {
-      for (const invalid of ['yes', 123, null]) {
-        const result = MdmConfigSchema.safeParse({ ...VALID_CONFIG, autoUpdate: invalid })
+    it('rejects missing autoUpdate', () => {
+      const { autoUpdate: _, ...configWithout } = VALID_CONFIG
+      expect(MdmConfigSchema.safeParse(configWithout).success).toBe(false)
+    })
 
-        expect(result.success).toBe(true)
-        if (result.success) expect(result.data.autoUpdate).toBe(true)
+    it('rejects non-boolean values', () => {
+      for (const invalid of ['yes', 123, null]) {
+        expect(MdmConfigSchema.safeParse({ ...VALID_CONFIG, autoUpdate: invalid }).success).toBe(false)
       }
+    })
+  })
+
+  describe('versionUrl', () => {
+    it('accepts a valid URL when autoUpdate is true', () => {
+      const result = MdmConfigSchema.safeParse(VALID_CONFIG)
+
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.versionUrl).toBe('https://customer-be.glean.com/api/v1/mdm/version')
+    })
+
+    it('is optional when autoUpdate is false', () => {
+      const result = MdmConfigSchema.safeParse({
+        autoUpdate: false,
+        binaryUrlPrefix: 'https://app.glean.com/static/mdm/binaries',
+      })
+
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.versionUrl).toBeUndefined()
+    })
+
+    it('rejects missing versionUrl when autoUpdate is true', () => {
+      const { versionUrl: _, ...configWithout } = VALID_CONFIG
+      expect(MdmConfigSchema.safeParse(configWithout).success).toBe(false)
+    })
+
+    it('rejects non-URL strings', () => {
+      expect(MdmConfigSchema.safeParse({ ...VALID_CONFIG, versionUrl: 'not-a-url' }).success).toBe(false)
     })
   })
 
@@ -166,19 +218,5 @@ describe('getServerUrl', () => {
         url: 'https://customer-be.glean.com/mcp/default',
       }),
     ).toBe('https://customer-be.glean.com/mcp/default')
-  })
-})
-
-describe('getBackendUrl', () => {
-  it('strips the /mcp/... path suffix', () => {
-    expect(getBackendUrl('https://customer-be.glean.com/mcp/default')).toBe('https://customer-be.glean.com')
-  })
-
-  it('strips a custom /mcp path', () => {
-    expect(getBackendUrl('https://customer-be.glean.com/mcp/custom/path')).toBe('https://customer-be.glean.com')
-  })
-
-  it('returns the URL unchanged if no /mcp/ path present', () => {
-    expect(getBackendUrl('https://customer-be.glean.com')).toBe('https://customer-be.glean.com')
   })
 })

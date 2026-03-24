@@ -1,4 +1,4 @@
-import { getBackendUrl, getServerUrl, readMdmConfig } from './config.js'
+import { getServerUrl, readMcpConfig, readMdmConfig } from './config.js'
 import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
@@ -7,7 +7,8 @@ import { enumerateUsers, lookupUser } from './users.js'
 import { BUILD_VERSION } from './version.js'
 
 export interface CliOptions {
-  configPath?: string
+  mcpConfigPath?: string
+  mdmConfigPath?: string
   dryRun: boolean
   showVersion: boolean
   singleUser?: string
@@ -24,8 +25,11 @@ export function parseArgs(args: string[]): CliOptions {
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
-      case '--config':
-        options.configPath = args[++i]
+      case '--mcp-config':
+        options.mcpConfigPath = args[++i]
+        break
+      case '--mdm-config':
+        options.mdmConfigPath = args[++i]
         break
       case '--dry-run':
         options.dryRun = true
@@ -79,12 +83,16 @@ async function main(): Promise<void> {
     return
   }
 
-  const config = readMdmConfig(args.configPath)
-  log.info(`Server: ${config.serverName} (${getServerUrl(config)})`)
+  const mcpConfig = readMcpConfig(args.mcpConfigPath)
+  const mdmConfig = readMdmConfig(args.mdmConfigPath)
 
-  if (!args.skipUpdate && config.autoUpdate) {
-    await checkForUpdate(getBackendUrl(config.url), config.binaryUrlPrefix, config.pinnedVersion)
-  } else if (!config.autoUpdate) {
+  for (const server of mcpConfig.servers) {
+    log.info(`Server: ${server.serverName} (${getServerUrl(server)})`)
+  }
+
+  if (!args.skipUpdate && mdmConfig.autoUpdate) {
+    await checkForUpdate(mdmConfig.versionUrl!, mdmConfig.binaryUrlPrefix, mdmConfig.pinnedVersion)
+  } else if (!mdmConfig.autoUpdate) {
     log.info('Auto-update disabled by configuration')
   }
 
@@ -109,7 +117,7 @@ async function main(): Promise<void> {
     log.info(`Configuring hosts for ${user.username} (${user.homeDir})`)
 
     const results = configureHosts({
-      config,
+      servers: mcpConfig.servers,
       dryRun: args.dryRun,
       gid: user.gid,
       uid: user.uid,

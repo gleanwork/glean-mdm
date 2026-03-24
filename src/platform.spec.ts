@@ -3,7 +3,8 @@ import { describe, it, expect } from 'vitest'
 import {
   getArch,
   getBinaryInstallPath,
-  getDefaultConfigPath,
+  getDefaultMcpConfigPath,
+  getDefaultMdmConfigPath,
   getLogFilePath,
   getPlatform,
   getTargetName,
@@ -35,15 +36,35 @@ describe('getTargetName', () => {
   })
 })
 
-describe('getDefaultConfigPath', () => {
+describe('getDefaultMcpConfigPath', () => {
   it('returns a non-empty path', () => {
-    expect(getDefaultConfigPath().length).toBeGreaterThan(0)
+    expect(getDefaultMcpConfigPath().length).toBeGreaterThan(0)
   })
 
   it("contains 'Glean' in the path", () => {
-    const path = getDefaultConfigPath()
+    const path = getDefaultMcpConfigPath()
 
     expect(path.toLowerCase()).toContain('glean')
+  })
+
+  it('ends with mcp-config.json', () => {
+    expect(getDefaultMcpConfigPath()).toMatch(/mcp-config\.json$/)
+  })
+})
+
+describe('getDefaultMdmConfigPath', () => {
+  it('returns a non-empty path', () => {
+    expect(getDefaultMdmConfigPath().length).toBeGreaterThan(0)
+  })
+
+  it("contains 'Glean' in the path", () => {
+    const path = getDefaultMdmConfigPath()
+
+    expect(path.toLowerCase()).toContain('glean')
+  })
+
+  it('ends with mdm-config.json', () => {
+    expect(getDefaultMdmConfigPath()).toMatch(/mdm-config\.json$/)
   })
 })
 
