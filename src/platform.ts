@@ -22,6 +22,17 @@ export function getTargetName(): string {
   return `${platformName}-${getArch()}`
 }
 
+export function getDefaultConfigDir(): string {
+  switch (getPlatform()) {
+    case 'darwin':
+      return '/Library/Application Support/Glean MDM'
+    case 'linux':
+      return '/etc/glean_mdm'
+    case 'win32':
+      return 'C:\\ProgramData\\Glean MDM'
+  }
+}
+
 export function getDefaultMcpConfigPath(): string {
   switch (getPlatform()) {
     case 'darwin':

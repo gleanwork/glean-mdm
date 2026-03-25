@@ -1,4 +1,7 @@
+import { ZodError } from 'zod'
+
 import { getServerUrl, readMcpConfig, readMdmConfig } from './config.js'
+import { writeConfig } from './config-writer.js'
 import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
@@ -13,7 +16,14 @@ export interface CliOptions {
   showVersion: boolean
   singleUser?: string
   skipUpdate: boolean
-  subcommand?: 'install-schedule' | 'uninstall-schedule' | 'uninstall'
+  subcommand?: 'install-schedule' | 'uninstall-schedule' | 'uninstall' | 'config'
+  serverName?: string
+  serverUrl?: string
+  autoUpdate?: boolean
+  versionUrl?: string
+  binaryUrlPrefix?: string
+  pinnedVersion?: string
+  outputDir?: string
 }
 
 export function parseArgs(args: string[]): CliOptions {
@@ -52,6 +62,33 @@ export function parseArgs(args: string[]): CliOptions {
       case 'uninstall':
         options.subcommand = 'uninstall'
         break
+      case 'config':
+        options.subcommand = 'config'
+        break
+      case '--server-name':
+        options.serverName = args[++i]
+        break
+      case '--server-url':
+        options.serverUrl = args[++i]
+        break
+      case '--auto-update':
+        options.autoUpdate = true
+        break
+      case '--no-auto-update':
+        options.autoUpdate = false
+        break
+      case '--version-url':
+        options.versionUrl = args[++i]
+        break
+      case '--binary-url-prefix':
+        options.binaryUrlPrefix = args[++i]
+        break
+      case '--pinned-version':
+        options.pinnedVersion = args[++i]
+        break
+      case '--output-dir':
+        options.outputDir = args[++i]
+        break
     }
   }
 
@@ -80,6 +117,42 @@ async function main(): Promise<void> {
   if (args.subcommand === 'uninstall') {
     uninstallSchedule()
     log.info('Uninstall complete (binary and config must be removed manually)')
+    return
+  }
+  if (args.subcommand === 'config') {
+    if (!args.serverName) {
+      process.stderr.write('Error: --server-name is required for config subcommand\n')
+      process.exit(1)
+    }
+    if (!args.serverUrl) {
+      process.stderr.write('Error: --server-url is required for config subcommand\n')
+      process.exit(1)
+    }
+    if (args.autoUpdate === undefined) {
+      process.stderr.write('Error: --auto-update or --no-auto-update is required for config subcommand\n')
+      process.exit(1)
+    }
+    if (!args.binaryUrlPrefix) {
+      process.stderr.write('Error: --binary-url-prefix is required for config subcommand\n')
+      process.exit(1)
+    }
+    try {
+      writeConfig({
+        serverName: args.serverName,
+        serverUrl: args.serverUrl,
+        autoUpdate: args.autoUpdate,
+        versionUrl: args.versionUrl,
+        binaryUrlPrefix: args.binaryUrlPrefix,
+        pinnedVersion: args.pinnedVersion,
+        outputDir: args.outputDir,
+      })
+    } catch (err) {
+      if (err instanceof ZodError) {
+        process.stderr.write(`Validation error: ${err.issues.map((i) => i.message).join(', ')}\n`)
+        process.exit(1)
+      }
+      throw err
+    }
     return
   }
 
