@@ -18,11 +18,14 @@ Configuration is driven by [`@gleanwork/mcp-config-glean`](https://www.npmjs.com
 ## Usage
 
 ```bash
+# Show help
+glean-mdm --help
+
 # Run for all users (typically as root/admin)
-glean-mdm
+glean-mdm setup
 
 # Dry run for a single user
-glean-mdm --dry-run --user alice
+glean-mdm setup --dry-run --user alice
 
 # Show version
 glean-mdm --version
@@ -109,7 +112,7 @@ bunx vitest run
 
 # Run locally
 bun run src/index.ts -- --version
-bun run src/index.ts -- --dry-run --mcp-config ci/smoke-dry-run-mcp-config.json --mdm-config ci/smoke-dry-run-mdm-config.json --user $(whoami)
+bun run src/index.ts -- setup --dry-run --mcp-config ci/smoke-dry-run-mcp-config.json --mdm-config ci/smoke-dry-run-mdm-config.json --user $(whoami)
 
 # Build binaries for all platforms
 ./build.sh

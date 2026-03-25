@@ -8,9 +8,18 @@ describe('parseArgs', () => {
 
     expect(result).toEqual({
       dryRun: false,
+      showHelp: false,
       showVersion: false,
       skipUpdate: false,
     })
+  })
+
+  it('parses --help flag', () => {
+    expect(parseArgs(['--help']).showHelp).toBe(true)
+  })
+
+  it('parses -h flag', () => {
+    expect(parseArgs(['-h']).showHelp).toBe(true)
   })
 
   it('parses --version flag', () => {
@@ -35,6 +44,10 @@ describe('parseArgs', () => {
 
   it('parses --user with username', () => {
     expect(parseArgs(['--user', 'alice']).singleUser).toBe('alice')
+  })
+
+  it('parses setup subcommand', () => {
+    expect(parseArgs(['setup']).subcommand).toBe('setup')
   })
 
   it('parses install-schedule subcommand', () => {

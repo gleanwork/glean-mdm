@@ -97,7 +97,7 @@ echo "MDM config: $(cat "$MDM_CONFIG_FILE")"
 
 echo ""
 echo "=== Run 1: Create configs ==="
-"$INSTALL_PATH" --skip-update --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" \
+"$INSTALL_PATH" setup --skip-update --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" \
   --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Binary exited with code $EXIT_CODE"
@@ -169,7 +169,7 @@ cat "$CHECKSUMS_RUN1"
 
 echo ""
 echo "=== Run 2: Verify idempotency ==="
-"$INSTALL_PATH" --skip-update --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" \
+"$INSTALL_PATH" setup --skip-update --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" \
   --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Second run exited with code $EXIT_CODE"

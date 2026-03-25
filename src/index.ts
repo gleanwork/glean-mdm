@@ -13,10 +13,11 @@ export interface CliOptions {
   mcpConfigPath?: string
   mdmConfigPath?: string
   dryRun: boolean
+  showHelp: boolean
   showVersion: boolean
   singleUser?: string
   skipUpdate: boolean
-  subcommand?: 'install-schedule' | 'uninstall-schedule' | 'uninstall' | 'config'
+  subcommand?: 'setup' | 'install-schedule' | 'uninstall-schedule' | 'uninstall' | 'config'
   serverName?: string
   serverUrl?: string
   autoUpdate?: boolean
@@ -29,6 +30,7 @@ export interface CliOptions {
 export function parseArgs(args: string[]): CliOptions {
   const options: CliOptions = {
     dryRun: false,
+    showHelp: false,
     showVersion: false,
     skipUpdate: false,
   }
@@ -50,8 +52,15 @@ export function parseArgs(args: string[]): CliOptions {
       case '--skip-update':
         options.skipUpdate = true
         break
+      case '--help':
+      case '-h':
+        options.showHelp = true
+        break
       case '--version':
         options.showVersion = true
+        break
+      case 'setup':
+        options.subcommand = 'setup'
         break
       case 'install-schedule':
         options.subcommand = 'install-schedule'
@@ -95,11 +104,52 @@ export function parseArgs(args: string[]): CliOptions {
   return options
 }
 
+function printHelp(): void {
+  process.stdout.write(`glean-mdm ${BUILD_VERSION}
+
+Configure MCP servers across AI coding tools on managed devices.
+
+Usage:
+  glean-mdm <command> [flags]
+
+Commands:
+  setup               Run host configuration for all users
+  config              Generate mcp-config.json and mdm-config.json files
+  install-schedule    Install system scheduled task (launchd/systemd/Task Scheduler)
+  uninstall-schedule  Remove system scheduled task
+  uninstall           Uninstall (removes schedule; binary/config must be removed manually)
+
+Flags:
+  -h, --help              Show this help message
+      --version           Show version
+      --dry-run           Simulate without making changes
+      --user <name>       Configure a single user instead of all users
+      --skip-update       Skip binary self-update check
+      --mcp-config <path> Custom path to MCP config file
+      --mdm-config <path> Custom path to MDM config file
+
+Config flags (used with 'config' command):
+      --server-name <name>        Identifier for the MCP server (required)
+      --server-url <url>          MCP server endpoint URL (required)
+      --auto-update               Enable automatic binary updates
+      --no-auto-update            Disable automatic binary updates
+      --version-url <url>         URL to fetch latest version info
+      --binary-url-prefix <url>   Base URL for downloading binaries (required)
+      --pinned-version <version>  Pin to a specific version
+      --output-dir <path>         Directory to write config files to
+`)
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2))
 
   if (args.showVersion) {
     process.stdout.write(`${BUILD_VERSION}\n`)
+    return
+  }
+
+  if (args.showHelp || !args.subcommand) {
+    printHelp()
     return
   }
 
@@ -156,6 +206,7 @@ async function main(): Promise<void> {
     return
   }
 
+  // subcommand === 'setup'
   const mcpConfig = readMcpConfig(args.mcpConfigPath)
   const mdmConfig = readMdmConfig(args.mdmConfigPath)
 

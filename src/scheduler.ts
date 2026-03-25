@@ -11,7 +11,7 @@ const WINDOWS_TASK_NAME = 'Glean MDM'
 
 /** Exposed for tests — argv array avoids shell quoting bugs when paths contain spaces. */
 export function schtasksCreateArgs(binaryPath: string): string[] {
-  return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', binaryPath, '/SC', 'DAILY', '/ST', '09:00', '/RU', 'SYSTEM', '/F']
+  return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', `${binaryPath} setup`, '/SC', 'DAILY', '/ST', '09:00', '/RU', 'SYSTEM', '/F']
 }
 
 function installMacOSSchedule(): void {
@@ -25,6 +25,7 @@ function installMacOSSchedule(): void {
     <key>ProgramArguments</key>
     <array>
         <string>${binaryPath}</string>
+        <string>setup</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>
@@ -76,7 +77,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=${binaryPath}
+ExecStart=${binaryPath} setup
 
 [Install]
 WantedBy=multi-user.target
