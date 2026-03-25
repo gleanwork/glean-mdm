@@ -3,8 +3,7 @@ set -euo pipefail
 
 BINARY="${1:?Usage: e2e-config-test.sh <binary>}"
 
-MCP_CONFIG_FILE="$(mktemp)"
-MDM_CONFIG_FILE="$(mktemp)"
+CONFIG_DIR="$(mktemp -d)"
 RUN_OUTPUT="$(mktemp)"
 CHECKSUMS_RUN1="$(mktemp)"
 CHECKSUMS_RUN2="$(mktemp)"
@@ -55,7 +54,8 @@ cleanup() {
     done
   done
 
-  rm -f "$MCP_CONFIG_FILE" "$MDM_CONFIG_FILE" "$RUN_OUTPUT" "$CHECKSUMS_RUN1" "$CHECKSUMS_RUN2" "${UNIQUE_FILES_FILE:-}" "$INSTALL_PATH"
+  rm -rf "$CONFIG_DIR"
+  rm -f "$RUN_OUTPUT" "$CHECKSUMS_RUN1" "$CHECKSUMS_RUN2" "${UNIQUE_FILES_FILE:-}" "$INSTALL_PATH"
   rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
   case "$(uname -s)" in
     Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
@@ -81,14 +81,16 @@ echo "=== Install binary ==="
 cp "$BINARY" "$INSTALL_PATH"
 chmod 755 "$INSTALL_PATH"
 
-echo "=== Create test configs ==="
-cat > "$MCP_CONFIG_FILE" <<'EOF'
-[{"serverName":"e2e_config_test","url":"https://example.invalid/mcp/default"}]
-EOF
+echo "=== Generate test configs via config subcommand ==="
+"$INSTALL_PATH" config \
+  --server-name e2e_config_test \
+  --server-url https://example.invalid/mcp/default \
+  --no-auto-update \
+  --binary-url-prefix https://example.invalid/static/mdm/binaries \
+  --output-dir "$CONFIG_DIR"
 
-cat > "$MDM_CONFIG_FILE" <<'EOF'
-{"autoUpdate":false,"binaryUrlPrefix":"https://example.invalid/static/mdm/binaries"}
-EOF
+MCP_CONFIG_FILE="$CONFIG_DIR/mcp-config.json"
+MDM_CONFIG_FILE="$CONFIG_DIR/mdm-config.json"
 
 echo "MCP config: $(cat "$MCP_CONFIG_FILE")"
 echo "MDM config: $(cat "$MDM_CONFIG_FILE")"

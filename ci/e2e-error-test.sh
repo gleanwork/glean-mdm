@@ -5,8 +5,7 @@ BINARY="${1:?Usage: e2e-error-test.sh <binary>}"
 
 PORT_FILE="$(mktemp)"
 BINARY_PORT_FILE="$(mktemp)"
-MCP_CONFIG_FILE="$(mktemp)"
-MDM_CONFIG_FILE="$(mktemp)"
+CONFIG_DIR="$(mktemp -d)"
 RUN_OUTPUT="$(mktemp)"
 MOCK_PID=""
 
@@ -37,7 +36,8 @@ esac
 cleanup() {
   echo "=== Cleanup ==="
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null || true
-  rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$MCP_CONFIG_FILE" "$MDM_CONFIG_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
+  rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
+  rm -rf "$CONFIG_DIR"
   rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
   case "$(uname -s)" in
     Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
@@ -110,14 +110,15 @@ run_and_check() {
   local binary_port
   binary_port=$(cat "$BINARY_PORT_FILE")
 
-  cat > "$MCP_CONFIG_FILE" <<EOF
-{"serverName":"e2e_test","url":"http://127.0.0.1:${port}/mcp/default"}
-EOF
-  cat > "$MDM_CONFIG_FILE" <<EOF
-{"autoUpdate":true,"versionUrl":"http://127.0.0.1:${port}/api/v1/mdm/version","binaryUrlPrefix":"http://127.0.0.1:${binary_port}/static/mdm/binaries"}
-EOF
+  "$INSTALL_PATH" config \
+    --server-name e2e_test \
+    --server-url "http://127.0.0.1:${port}/mcp/default" \
+    --auto-update \
+    --version-url "http://127.0.0.1:${port}/api/v1/mdm/version" \
+    --binary-url-prefix "http://127.0.0.1:${binary_port}/static/mdm/binaries" \
+    --output-dir "$CONFIG_DIR"
 
-  "$INSTALL_PATH" --dry-run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
+  "$INSTALL_PATH" --dry-run --mcp-config "$CONFIG_DIR/mcp-config.json" --mdm-config "$CONFIG_DIR/mdm-config.json" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
     EXIT_CODE=$?
     echo "FAIL [$scenario]: Binary exited with code $EXIT_CODE"
     echo "=== Output ==="
