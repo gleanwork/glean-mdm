@@ -20,7 +20,7 @@ case "$(uname -s)" in
     INSTALL_PATH="$INSTALL_DIR/glean-mdm"
     LOG_FILE="/var/log/glean-mdm.log"
     SCHEDULE_TYPE="launchdaemon"
-    PLIST_FILE="/Library/LaunchDaemons/com.glean.mdm-setup.plist"
+    PLIST_FILE="/Library/LaunchDaemons/com.glean.mdm.plist"
     ;;
   MINGW*|MSYS*|CYGWIN*)
     INSTALL_DIR="/c/Program Files/Glean"
@@ -28,7 +28,7 @@ case "$(uname -s)" in
     LOG_DIR="/c/ProgramData/Glean MDM"
     LOG_FILE="$LOG_DIR/glean-mdm.log"
     SCHEDULE_TYPE="schtasks"
-    TASK_NAME="Glean MDM Setup"
+    TASK_NAME="Glean MDM"
     ;;
   *)
     echo "FAIL: Unsupported platform: $(uname -s)"
@@ -141,13 +141,13 @@ case "$SCHEDULE_TYPE" in
     fi
     echo "PASS [plist-content]: Plist references correct binary path"
 
-    if ! grep -q "com.glean.mdm-setup" "$PLIST_FILE"; then
+    if ! grep -q "com.glean.mdm" "$PLIST_FILE"; then
       echo "FAIL [plist-label]: Plist missing label"
       exit 1
     fi
     echo "PASS [plist-label]: Plist has correct label"
 
-    if ! sudo launchctl print system/com.glean.mdm-setup > /dev/null 2>&1; then
+    if ! sudo launchctl print system/com.glean.mdm > /dev/null 2>&1; then
       echo "FAIL [daemon-loaded]: LaunchDaemon not loaded in system domain"
       exit 1
     fi
@@ -240,7 +240,7 @@ case "$SCHEDULE_TYPE" in
     fi
     echo "PASS [plist-removed]: Plist file removed"
 
-    if sudo launchctl print system/com.glean.mdm-setup > /dev/null 2>&1; then
+    if sudo launchctl print system/com.glean.mdm > /dev/null 2>&1; then
       echo "FAIL [daemon-unloaded]: LaunchDaemon still loaded after uninstall"
       exit 1
     fi
