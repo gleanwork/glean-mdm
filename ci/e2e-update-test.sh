@@ -6,8 +6,7 @@ NEW_BINARY="${2:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 
 PORT_FILE="$(mktemp)"
 BINARY_PORT_FILE="$(mktemp)"
-MCP_CONFIG_FILE="$(mktemp)"
-MDM_CONFIG_FILE="$(mktemp)"
+CONFIG_DIR="$(mktemp -d)"
 RUN_OUTPUT="$(mktemp)"
 MOCK_PID=""
 
@@ -38,7 +37,8 @@ esac
 cleanup() {
   echo "=== Cleanup ==="
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null || true
-  rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$MCP_CONFIG_FILE" "$MDM_CONFIG_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
+  rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
+  rm -rf "$CONFIG_DIR"
   rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
   case "$(uname -s)" in
     Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
@@ -102,13 +102,19 @@ if [ "$HTTP_CODE" != "200" ]; then
 fi
 echo "Mock server health check OK"
 
-echo "=== Create test configs ==="
-cat > "$MCP_CONFIG_FILE" <<EOF
-{"serverName":"e2e_test","url":"http://127.0.0.1:${PORT}/mcp/default"}
-EOF
-cat > "$MDM_CONFIG_FILE" <<EOF
-{"autoUpdate":true,"versionUrl":"http://127.0.0.1:${PORT}/api/v1/mdm/version","binaryUrlPrefix":"http://127.0.0.1:${BINARY_PORT}/static/mdm/binaries"}
-EOF
+echo "=== Generate test configs via config subcommand ==="
+# Use the new (PR) binary since the old binary may not have the config subcommand
+"$NEW_BINARY" config \
+  --server-name e2e_test \
+  --server-url "http://127.0.0.1:${PORT}/mcp/default" \
+  --auto-update \
+  --version-url "http://127.0.0.1:${PORT}/api/v1/mdm/version" \
+  --binary-url-prefix "http://127.0.0.1:${BINARY_PORT}/static/mdm/binaries" \
+  --output-dir "$CONFIG_DIR"
+
+MCP_CONFIG_FILE="$CONFIG_DIR/mcp-config.json"
+MDM_CONFIG_FILE="$CONFIG_DIR/mdm-config.json"
+
 echo "MCP config: $(cat "$MCP_CONFIG_FILE")"
 echo "MDM config: $(cat "$MDM_CONFIG_FILE")"
 

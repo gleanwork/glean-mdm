@@ -32,9 +32,34 @@ glean-mdm install-schedule
 glean-mdm uninstall-schedule
 ```
 
+### Generating config files
+
+Use the `config` subcommand to generate both config files:
+
+```bash
+glean-mdm config \
+  --server-name glean_default \
+  --server-url https://your-company-be.glean.com/mcp/default \
+  --auto-update \
+  --version-url https://your-company-be.glean.com/api/v1/mdm/version \
+  --binary-url-prefix https://app.glean.com/static/mdm/binaries
+```
+
+This writes `mcp-config.json` and `mdm-config.json` to the platform-specific default directory. Use `--output-dir` to write to a custom location instead.
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--server-name` | yes | Identifier for the MCP server |
+| `--server-url` | yes | MCP server endpoint URL |
+| `--auto-update` / `--no-auto-update` | yes | Enable or disable automatic binary updates |
+| `--version-url` | if `--auto-update` | URL to fetch latest version info |
+| `--binary-url-prefix` | yes | Base URL for downloading binaries |
+| `--pinned-version` | no | Pin to a specific version (e.g. `1.2.3` or `v1.2.3`) |
+| `--output-dir` | no | Directory to write config files to (defaults to platform path) |
+
 ### Configuration
 
-Place config files at the platform-specific default paths:
+Config files are located at the platform-specific default paths:
 
 | Platform | MCP Config | MDM Config |
 |----------|------------|------------|
