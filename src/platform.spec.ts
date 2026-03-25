@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import {
   getArch,
   getBinaryInstallPath,
+  getDefaultConfigDir,
   getDefaultMcpConfigPath,
   getDefaultMdmConfigPath,
   getLogFilePath,
@@ -33,6 +34,16 @@ describe('getTargetName', () => {
     const target = getTargetName()
 
     expect(target).toMatch(TARGET_FORMAT)
+  })
+})
+
+describe('getDefaultConfigDir', () => {
+  it('returns a non-empty path', () => {
+    expect(getDefaultConfigDir().length).toBeGreaterThan(0)
+  })
+
+  it("contains 'glean' in the path (case-insensitive)", () => {
+    expect(getDefaultConfigDir().toLowerCase()).toContain('glean')
   })
 })
 
