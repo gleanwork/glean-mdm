@@ -9,7 +9,7 @@ describe('schtasksCreateArgs', () => {
     expect(schtasksCreateArgs(pathWithSpaces)).toEqual([
       '/Create',
       '/TN',
-      'Glean MDM Setup',
+      'Glean MDM',
       '/TR',
       pathWithSpaces,
       '/SC',

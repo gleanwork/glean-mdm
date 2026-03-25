@@ -7,7 +7,7 @@ import { getBinaryInstallPath, getPlatform } from './platform.js'
 const MACOS_PLIST_PATH = '/Library/LaunchDaemons/com.glean.mdm.plist'
 const LINUX_SERVICE_PATH = '/etc/systemd/system/glean-mdm.service'
 const LINUX_TIMER_PATH = '/etc/systemd/system/glean-mdm.timer'
-const WINDOWS_TASK_NAME = 'Glean MDM Setup'
+const WINDOWS_TASK_NAME = 'Glean MDM'
 
 /** Exposed for tests — argv array avoids shell quoting bugs when paths contain spaces. */
 export function schtasksCreateArgs(binaryPath: string): string[] {
@@ -70,7 +70,7 @@ function installLinuxSchedule(): void {
   const binaryPath = getBinaryInstallPath()
 
   const service = `[Unit]
-Description=Glean MDM Setup
+Description=Glean MDM
 After=network-online.target
 Wants=network-online.target
 
@@ -83,7 +83,7 @@ WantedBy=multi-user.target
 `
 
   const timer = `[Unit]
-Description=Daily Glean MDM Setup
+Description=Daily Glean MDM
 
 [Timer]
 OnCalendar=daily

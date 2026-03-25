@@ -28,7 +28,7 @@ case "$(uname -s)" in
     LOG_DIR="/c/ProgramData/Glean MDM"
     LOG_FILE="$LOG_DIR/glean-mdm.log"
     SCHEDULE_TYPE="schtasks"
-    TASK_NAME="Glean MDM Setup"
+    TASK_NAME="Glean MDM"
     ;;
   *)
     echo "FAIL: Unsupported platform: $(uname -s)"
