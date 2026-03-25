@@ -4,7 +4,7 @@ import { unlinkSync, writeFileSync } from 'node:fs'
 import { log } from './logger.js'
 import { getBinaryInstallPath, getPlatform } from './platform.js'
 
-const MACOS_PLIST_PATH = '/Library/LaunchDaemons/com.glean.mdm-setup.plist'
+const MACOS_PLIST_PATH = '/Library/LaunchDaemons/com.glean.mdm.plist'
 const LINUX_SERVICE_PATH = '/etc/systemd/system/glean-mdm.service'
 const LINUX_TIMER_PATH = '/etc/systemd/system/glean-mdm.timer'
 const WINDOWS_TASK_NAME = 'Glean MDM Setup'
@@ -21,7 +21,7 @@ function installMacOSSchedule(): void {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.glean.mdm-setup</string>
+    <string>com.glean.mdm</string>
     <key>ProgramArguments</key>
     <array>
         <string>${binaryPath}</string>
