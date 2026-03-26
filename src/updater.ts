@@ -8,7 +8,7 @@ import { getBinaryInstallPath, getPlatform, getTargetName } from './platform.js'
 import { BUILD_VERSION } from './version.js'
 
 interface VersionInfo {
-  checksums: Record<string, string>
+  checksums?: Record<string, string>
   version: string
 }
 
@@ -72,10 +72,9 @@ export async function checkForUpdate(versionUrl: string, binaryUrlPrefix: string
     }
 
     targetVersion = versionInfo.version
-    expectedChecksum = versionInfo.checksums[target]
+    expectedChecksum = versionInfo.checksums?.[target]
     if (!expectedChecksum) {
-      log.error(`No checksum for target ${target}`)
-      return false
+      log.warn(`No checksum available for target ${target}, skipping integrity check`)
     }
   }
 
