@@ -96,6 +96,45 @@ echo "MCP config: $(cat "$MCP_CONFIG_FILE")"
 echo "MDM config: $(cat "$MDM_CONFIG_FILE")"
 
 echo ""
+echo "=== Re-run config with same server-name (expect skip) ==="
+"$INSTALL_PATH" config \
+  --server-name e2e_config_test \
+  --server-url https://different.invalid/mcp/default \
+  --no-auto-update \
+  --binary-url-prefix https://example.invalid/static/mdm/binaries \
+  --output-dir "$CONFIG_DIR"
+
+MCP_AFTER_SKIP="$(cat "$MCP_CONFIG_FILE")"
+echo "MCP config after skip: $MCP_AFTER_SKIP"
+
+if echo "$MCP_AFTER_SKIP" | grep -q "example.invalid/mcp/default"; then
+  echo "PASS [skip-preserves-original]: Original server URL preserved"
+else
+  echo "FAIL [skip-preserves-original]: Original server URL was overwritten"
+  exit 1
+fi
+
+echo ""
+echo "=== Run config with new server-name (expect append) ==="
+"$INSTALL_PATH" config \
+  --server-name e2e_second_server \
+  --server-url https://second.invalid/mcp/default \
+  --no-auto-update \
+  --binary-url-prefix https://example.invalid/static/mdm/binaries \
+  --output-dir "$CONFIG_DIR"
+
+MCP_AFTER_APPEND="$(cat "$MCP_CONFIG_FILE")"
+echo "MCP config after append: $MCP_AFTER_APPEND"
+
+ENTRY_COUNT=$(echo "$MCP_AFTER_APPEND" | grep -c '"serverName"')
+if [ "$ENTRY_COUNT" -eq 2 ]; then
+  echo "PASS [append-new-server]: Two server entries present"
+else
+  echo "FAIL [append-new-server]: Expected 2 entries, found $ENTRY_COUNT"
+  exit 1
+fi
+
+echo ""
 echo "=== Run 1: Create configs ==="
 "$INSTALL_PATH" setup --skip-update --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" \
   --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {

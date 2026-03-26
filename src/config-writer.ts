@@ -1,7 +1,7 @@
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { McpConfigSchema, MdmConfigSchema } from './config.js'
+import { McpConfigSchema, type McpServerEntry, MdmConfigSchema } from './config.js'
 import { log } from './logger.js'
 import { getDefaultConfigDir } from './platform.js'
 
@@ -15,12 +15,26 @@ export interface WriteConfigOptions {
   outputDir?: string
 }
 
+function readExistingMcpEntries(filePath: string): McpServerEntry[] {
+  let raw: string
+  try {
+    raw = readFileSync(filePath, 'utf-8')
+  } catch (err: any) {
+    if (err.code === 'ENOENT') {
+      return []
+    }
+    throw err
+  }
+  const json = JSON.parse(raw)
+  return McpConfigSchema.parse(json)
+}
+
 export function writeConfig(options: WriteConfigOptions): void {
   const outputDir = options.outputDir ?? getDefaultConfigDir()
   mkdirSync(outputDir, { recursive: true })
 
-  const mcpData = [{ serverName: options.serverName, url: options.serverUrl }]
-  McpConfigSchema.parse(mcpData)
+  const newEntry = { serverName: options.serverName, url: options.serverUrl }
+  McpConfigSchema.parse([newEntry])
 
   const mdmData: Record<string, unknown> = {
     autoUpdate: options.autoUpdate,
@@ -31,15 +45,23 @@ export function writeConfig(options: WriteConfigOptions): void {
   const parsedMdm = MdmConfigSchema.parse(mdmData)
 
   const mcpPath = join(outputDir, 'mcp-config.json')
-  const mcpTmp = `${mcpPath}.tmp`
-  writeFileSync(mcpTmp, JSON.stringify(mcpData, null, 2) + '\n')
-  renameSync(mcpTmp, mcpPath)
+  const existingEntries = readExistingMcpEntries(mcpPath)
+  const alreadyExists = existingEntries.some((e) => e.serverName === newEntry.serverName)
+
+  if (alreadyExists) {
+    log.info(`Skipped ${mcpPath} (entry "${newEntry.serverName}" already exists)`)
+  } else {
+    const merged = [...existingEntries, newEntry]
+    const mcpTmp = `${mcpPath}.tmp`
+    writeFileSync(mcpTmp, JSON.stringify(merged, null, 2) + '\n')
+    renameSync(mcpTmp, mcpPath)
+    log.info(`Added entry "${newEntry.serverName}" to ${mcpPath}`)
+  }
 
   const mdmPath = join(outputDir, 'mdm-config.json')
   const mdmTmp = `${mdmPath}.tmp`
   writeFileSync(mdmTmp, JSON.stringify(parsedMdm, null, 2) + '\n')
   renameSync(mdmTmp, mdmPath)
 
-  log.info(`Wrote ${mcpPath}`)
   log.info(`Wrote ${mdmPath}`)
 }
