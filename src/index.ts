@@ -17,7 +17,7 @@ export interface CliOptions {
   showVersion: boolean
   singleUser?: string
   skipUpdate: boolean
-  subcommand?: 'setup' | 'install-schedule' | 'uninstall-schedule' | 'uninstall' | 'config'
+  subcommand?: 'run' | 'install-schedule' | 'uninstall-schedule' | 'uninstall' | 'config'
   serverName?: string
   serverUrl?: string
   autoUpdate?: boolean
@@ -59,8 +59,8 @@ export function parseArgs(args: string[]): CliOptions {
       case '--version':
         options.showVersion = true
         break
-      case 'setup':
-        options.subcommand = 'setup'
+      case 'run':
+        options.subcommand = 'run'
         break
       case 'install-schedule':
         options.subcommand = 'install-schedule'
@@ -113,7 +113,7 @@ Usage:
   glean-mdm <command> [flags]
 
 Commands:
-  setup               Run host configuration for all users
+  run                 Run host configuration for all users
   config              Generate mcp-config.json and mdm-config.json files
   install-schedule    Install system scheduled task (launchd/systemd/Task Scheduler)
   uninstall-schedule  Remove system scheduled task
@@ -206,7 +206,7 @@ async function main(): Promise<void> {
     return
   }
 
-  // subcommand === 'setup'
+  // subcommand === 'run'
   const mcpConfig = readMcpConfig(args.mcpConfigPath)
   const mdmConfig = readMdmConfig(args.mdmConfigPath)
 
