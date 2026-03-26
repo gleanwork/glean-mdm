@@ -57,7 +57,7 @@ function installMacOSSchedule(): void {
     // May not be loaded
   }
   execSync(`launchctl bootstrap system "${MACOS_PLIST_PATH}"`)
-  log.info('Installed macOS LaunchDaemon schedule')
+  log.info(`Installed macOS LaunchDaemon schedule (daily at 9:${String(minute).padStart(2, '0')} AM)`)
 }
 
 function uninstallMacOSSchedule(): void {
@@ -106,7 +106,7 @@ WantedBy=timers.target
   writeFileSync(LINUX_TIMER_PATH, timer)
   execSync('systemctl daemon-reload')
   execSync('systemctl enable --now glean-mdm.timer')
-  log.info('Installed systemd timer schedule')
+  log.info(`Installed systemd timer schedule (daily at 9:${String(minute).padStart(2, '0')} AM)`)
 }
 
 function uninstallLinuxSchedule(): void {
@@ -143,7 +143,7 @@ function installWindowsSchedule(): void {
   execSync(
     `powershell -Command "$t = Get-ScheduledTask '${WINDOWS_TASK_NAME}'; $t.Settings.StartWhenAvailable = $true; $t | Set-ScheduledTask"`,
   )
-  log.info('Installed Windows Task Scheduler schedule')
+  log.info(`Installed Windows Task Scheduler schedule (daily at 9:${String(minute).padStart(2, '0')} AM)`)
 }
 
 function uninstallWindowsSchedule(): void {
