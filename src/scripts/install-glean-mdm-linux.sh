@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-BACKEND_URL="https://glean-dev-be.glean.com"
+BACKEND_URL="{{BACKEND_URL}}"
 BINARY_URL_PREFIX="https://app.glean.com/static/mdm/binaries"
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="glean-mdm"
@@ -65,8 +65,8 @@ echo "Binary installed to ${INSTALL_DIR}/${BINARY_NAME}"
 
 echo "Creating configuration..."
 "${INSTALL_DIR}/${BINARY_NAME}" config \
-  --server-name "glean_foo" \
-  --server-url "https://glean-dev-be.glean.com/mcp/foo" \
+  --server-name "{{SERVER_NAME}}" \
+  --server-url "{{SERVER_URL}}" \
   --auto-update \
   --version-url "${BACKEND_URL}/api/v1/mdm/version" \
   --binary-url-prefix "${BINARY_URL_PREFIX}"
