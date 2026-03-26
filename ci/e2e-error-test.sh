@@ -118,7 +118,7 @@ run_and_check() {
     --binary-url-prefix "http://127.0.0.1:${binary_port}/static/mdm/binaries" \
     --output-dir "$CONFIG_DIR"
 
-  "$INSTALL_PATH" --dry-run --mcp-config "$CONFIG_DIR/mcp-config.json" --mdm-config "$CONFIG_DIR/mdm-config.json" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
+  "$INSTALL_PATH" setup --dry-run --mcp-config "$CONFIG_DIR/mcp-config.json" --mdm-config "$CONFIG_DIR/mdm-config.json" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
     EXIT_CODE=$?
     echo "FAIL [$scenario]: Binary exited with code $EXIT_CODE"
     echo "=== Output ==="

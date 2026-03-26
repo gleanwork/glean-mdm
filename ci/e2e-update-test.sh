@@ -119,7 +119,7 @@ echo "MCP config: $(cat "$MCP_CONFIG_FILE")"
 echo "MDM config: $(cat "$MDM_CONFIG_FILE")"
 
 echo "=== Run old binary (triggers update) ==="
-"$INSTALL_PATH" --dry-run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
+"$INSTALL_PATH" setup --dry-run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Binary exited with code $EXIT_CODE"
   echo "=== Output ==="
@@ -143,7 +143,7 @@ if [ "$INSTALLED_VERSION" != "99.0.0" ]; then
 fi
 
 echo "=== Run new binary again (should not update) ==="
-"$INSTALL_PATH" --dry-run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
+"$INSTALL_PATH" setup --dry-run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Second run exited with code $EXIT_CODE"
   tr -d '\r' < "$RUN_OUTPUT"
