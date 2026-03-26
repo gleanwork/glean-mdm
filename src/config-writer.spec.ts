@@ -1,4 +1,4 @@
-import { readFileSync, mkdtempSync } from 'node:fs'
+import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -132,5 +132,128 @@ describe('writeConfig', () => {
 
     expect(mcp1).toBe(mcp2)
     expect(mdm1).toBe(mdm2)
+  })
+
+  it('appends a new server entry when a different serverName exists', () => {
+    writeConfig({
+      serverName: 'server_a',
+      serverUrl: 'https://a.example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    writeConfig({
+      serverName: 'server_b',
+      serverUrl: 'https://b.example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    const mcp = JSON.parse(readFileSync(join(outputDir, 'mcp-config.json'), 'utf-8'))
+    expect(mcp).toHaveLength(2)
+    expect(mcp[0]).toEqual({ serverName: 'server_a', url: 'https://a.example.com/mcp/default' })
+    expect(mcp[1]).toEqual({ serverName: 'server_b', url: 'https://b.example.com/mcp/default' })
+  })
+
+  it('skips mcp-config.json entry when same serverName already exists', () => {
+    writeConfig({
+      serverName: 'glean_default',
+      serverUrl: 'https://original.example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    writeConfig({
+      serverName: 'glean_default',
+      serverUrl: 'https://updated.example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    const mcp = JSON.parse(readFileSync(join(outputDir, 'mcp-config.json'), 'utf-8'))
+    expect(mcp).toHaveLength(1)
+    expect(mcp[0].url).toBe('https://original.example.com/mcp/default')
+  })
+
+  it('appends to an existing single-object mcp-config.json file', () => {
+    const mcpPath = join(outputDir, 'mcp-config.json')
+    writeFileSync(
+      mcpPath,
+      JSON.stringify({ serverName: 'legacy_server', url: 'https://legacy.example.com/mcp/default' }) + '\n',
+    )
+
+    writeConfig({
+      serverName: 'new_server',
+      serverUrl: 'https://new.example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'))
+    expect(mcp).toHaveLength(2)
+    expect(mcp[0]).toEqual({ serverName: 'legacy_server', url: 'https://legacy.example.com/mcp/default' })
+    expect(mcp[1]).toEqual({ serverName: 'new_server', url: 'https://new.example.com/mcp/default' })
+  })
+
+  it('skips when serverName exists in a single-object format file', () => {
+    const mcpPath = join(outputDir, 'mcp-config.json')
+    const original = JSON.stringify({ serverName: 'glean_default', url: 'https://legacy.example.com/mcp/default' }) + '\n'
+    writeFileSync(mcpPath, original)
+
+    writeConfig({
+      serverName: 'glean_default',
+      serverUrl: 'https://new.example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    const content = readFileSync(mcpPath, 'utf-8')
+    expect(content).toBe(original)
+  })
+
+  it('always overwrites mdm-config.json even when mcp entry is skipped', () => {
+    writeConfig({
+      serverName: 'glean_default',
+      serverUrl: 'https://example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    writeConfig({
+      serverName: 'glean_default',
+      serverUrl: 'https://example.com/mcp/default',
+      autoUpdate: true,
+      versionUrl: 'https://example.com/version',
+      binaryUrlPrefix: 'https://example.com/binaries-v2',
+      outputDir,
+    })
+
+    const mdm = JSON.parse(readFileSync(join(outputDir, 'mdm-config.json'), 'utf-8'))
+    expect(mdm.autoUpdate).toBe(true)
+    expect(mdm.versionUrl).toBe('https://example.com/version')
+    expect(mdm.binaryUrlPrefix).toBe('https://example.com/binaries-v2')
+  })
+
+  it('appends multiple distinct servers across successive calls', () => {
+    const base = {
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    } as const
+
+    writeConfig({ ...base, serverName: 'server_a', serverUrl: 'https://a.example.com/mcp' })
+    writeConfig({ ...base, serverName: 'server_b', serverUrl: 'https://b.example.com/mcp' })
+    writeConfig({ ...base, serverName: 'server_c', serverUrl: 'https://c.example.com/mcp' })
+
+    const mcp = JSON.parse(readFileSync(join(outputDir, 'mcp-config.json'), 'utf-8'))
+    expect(mcp).toHaveLength(3)
+    expect(mcp.map((e: { serverName: string }) => e.serverName)).toEqual(['server_a', 'server_b', 'server_c'])
   })
 })
