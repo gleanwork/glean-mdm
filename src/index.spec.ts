@@ -46,8 +46,8 @@ describe('parseArgs', () => {
     expect(parseArgs(['--user', 'alice']).singleUser).toBe('alice')
   })
 
-  it('parses setup subcommand', () => {
-    expect(parseArgs(['setup']).subcommand).toBe('setup')
+  it('parses run subcommand', () => {
+    expect(parseArgs(['run']).subcommand).toBe('run')
   })
 
   it('parses install-schedule subcommand', () => {

@@ -17,7 +17,7 @@ export function randomMinute(): number {
 /** Exposed for tests — argv array avoids shell quoting bugs when paths contain spaces. */
 export function schtasksCreateArgs(binaryPath: string, minute: number): string[] {
   const startTime = `09:${String(minute).padStart(2, '0')}`
-  return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', `${binaryPath} setup`, '/SC', 'DAILY', '/ST', startTime, '/RU', 'SYSTEM', '/F']
+  return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', `${binaryPath} run`, '/SC', 'DAILY', '/ST', startTime, '/RU', 'SYSTEM', '/F']
 }
 
 function installMacOSSchedule(): void {
@@ -32,7 +32,7 @@ function installMacOSSchedule(): void {
     <key>ProgramArguments</key>
     <array>
         <string>${binaryPath}</string>
-        <string>setup</string>
+        <string>run</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>
@@ -84,7 +84,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=${binaryPath} setup
+ExecStart=${binaryPath} run
 
 [Install]
 WantedBy=multi-user.target
