@@ -1,12 +1,12 @@
 #Requires -RunAsAdministrator
 #
-# install-glean-mdm-windows.ps1
+# install-glean-mdm-windows-pinned.ps1
 #
-# Installs the Glean MDM binary on Windows, configures it,
-# and sets up a schedule.
+# Installs a specific version of the Glean MDM binary on Windows,
+# configures it, and sets up a schedule.
 #
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File install-glean-mdm-windows.ps1
+#   powershell -ExecutionPolicy Bypass -File install-glean-mdm-windows-pinned.ps1
 
 $ErrorActionPreference = "Stop"
 
@@ -15,19 +15,10 @@ $BinaryUrlPrefix = "https://app.glean.com/static/mdm/binaries"
 $InstallDir = "C:\Program Files\Glean"
 $BinaryName = "glean-mdm.exe"
 
-# ── Fetch version ─────────────────────────────────────────────────────────────
+# ── Version ──────────────────────────────────────────────────────────────────
 
-Write-Host "Fetching latest version..."
-$VersionResponse = Invoke-WebRequest -Uri "$BackendUrl/api/v1/mdm/version" -UseBasicParsing
-$VersionJson = $VersionResponse.Content | ConvertFrom-Json
-$Version = $VersionJson.version
-
-if (-not $Version) {
-    Write-Error "Failed to fetch MDM version from $BackendUrl/api/v1/mdm/version"
-    exit 1
-}
-
-Write-Host "Latest version: $Version"
+$Version = "{{PINNED_VERSION}}"
+Write-Host "Pinned version: $Version"
 
 # ── Download binary ───────────────────────────────────────────────────────────
 
@@ -49,7 +40,8 @@ Write-Host "Creating configuration..."
 & "$InstallDir\\$BinaryName" config `
   --server-name "{{SERVER_NAME}}" `
   --server-url "{{SERVER_URL}}" `
-  --auto-update `
+  --no-auto-update `
+  --pinned-version "{{PINNED_VERSION}}" `
   --version-url "$BackendUrl/api/v1/mdm/version" `
   --binary-url-prefix "$BinaryUrlPrefix"
 

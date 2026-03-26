@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# install-glean-mdm-macos.sh
+# install-glean-mdm-linux-pinned.sh
 #
-# Installs the Glean MDM binary on macOS, configures it,
-# and sets up a schedule.
+# Installs a specific version of the Glean MDM binary on Linux,
+# configures it, and sets up a schedule.
 #
 # Usage:
-#   sudo bash install-glean-mdm-macos.sh
+#   sudo bash install-glean-mdm-linux-pinned.sh
 
 set -euo pipefail
 
@@ -14,6 +14,17 @@ BACKEND_URL="{{BACKEND_URL}}"
 BINARY_URL_PREFIX="https://app.glean.com/static/mdm/binaries"
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="glean-mdm"
+
+# ── Detect download tool ─────────────────────────────────────────────────────
+
+if command -v curl >/dev/null 2>&1; then
+    download_file() { curl -fsSL -o "$1" "$2"; }
+elif command -v wget >/dev/null 2>&1; then
+    download_file() { wget -qO "$1" "$2"; }
+else
+    echo "ERROR: curl or wget is required but neither was found."
+    exit 1
+fi
 
 # ── Detect architecture ──────────────────────────────────────────────────────
 
@@ -26,26 +37,17 @@ esac
 
 echo "Detected architecture: $ARCH"
 
-# ── Fetch version ─────────────────────────────────────────────────────────────
+# ── Version ──────────────────────────────────────────────────────────────────
 
-echo "Fetching latest version..."
-VERSION_RESPONSE=$(curl -fsSL "${BACKEND_URL}/api/v1/mdm/version")
-VERSION=$(echo "$VERSION_RESPONSE" | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
-
-if [ -z "$VERSION" ]; then
-    echo "ERROR: Failed to fetch MDM version from ${BACKEND_URL}/api/v1/mdm/version"
-    exit 1
-fi
-
-echo "Latest version: $VERSION"
+VERSION="{{PINNED_VERSION}}"
+echo "Pinned version: $VERSION"
 
 # ── Download binary ───────────────────────────────────────────────────────────
 
-BINARY_URL="${BINARY_URL_PREFIX}/${VERSION}/glean-mdm-darwin-${ARCH}"
+BINARY_URL="${BINARY_URL_PREFIX}/${VERSION}/glean-mdm-linux-${ARCH}"
 echo "Downloading from $BINARY_URL..."
-curl -fsSL -o "${INSTALL_DIR}/${BINARY_NAME}" "$BINARY_URL"
+download_file "${INSTALL_DIR}/${BINARY_NAME}" "$BINARY_URL"
 chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
-xattr -d com.apple.quarantine "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
 
 echo "Binary installed to ${INSTALL_DIR}/${BINARY_NAME}"
 
@@ -55,7 +57,8 @@ echo "Creating configuration..."
 "${INSTALL_DIR}/${BINARY_NAME}" config \
   --server-name "{{SERVER_NAME}}" \
   --server-url "{{SERVER_URL}}" \
-  --auto-update \
+  --no-auto-update \
+  --pinned-version "{{PINNED_VERSION}}" \
   --version-url "${BACKEND_URL}/api/v1/mdm/version" \
   --binary-url-prefix "${BINARY_URL_PREFIX}"
 

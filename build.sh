@@ -53,4 +53,10 @@ checksums_json+="}}"
 echo "$checksums_json" | python3 -m json.tool > version.json
 cat version.json
 
+cd ..
+
+echo "Copying install scripts..."
+cp src/scripts/install-glean-mdm-*.sh "$DIST_DIR/"
+cp src/scripts/install-glean-mdm-*.ps1 "$DIST_DIR/"
+
 echo "Build complete: ${DIST_DIR}/"
