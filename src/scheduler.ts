@@ -9,13 +9,20 @@ const LINUX_SERVICE_PATH = '/etc/systemd/system/glean-mdm.service'
 const LINUX_TIMER_PATH = '/etc/systemd/system/glean-mdm.timer'
 const WINDOWS_TASK_NAME = 'Glean MDM'
 
+/** Random minute (0–59) to stagger scheduled runs and avoid thundering-herd on the version endpoint. */
+export function randomMinute(): number {
+  return Math.floor(Math.random() * 60)
+}
+
 /** Exposed for tests — argv array avoids shell quoting bugs when paths contain spaces. */
-export function schtasksCreateArgs(binaryPath: string): string[] {
-  return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', `${binaryPath} setup`, '/SC', 'DAILY', '/ST', '09:00', '/RU', 'SYSTEM', '/F']
+export function schtasksCreateArgs(binaryPath: string, minute: number): string[] {
+  const startTime = `09:${String(minute).padStart(2, '0')}`
+  return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', `${binaryPath} setup`, '/SC', 'DAILY', '/ST', startTime, '/RU', 'SYSTEM', '/F']
 }
 
 function installMacOSSchedule(): void {
   const binaryPath = getBinaryInstallPath()
+  const minute = randomMinute()
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -32,7 +39,7 @@ function installMacOSSchedule(): void {
         <key>Hour</key>
         <integer>9</integer>
         <key>Minute</key>
-        <integer>0</integer>
+        <integer>${minute}</integer>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -50,7 +57,7 @@ function installMacOSSchedule(): void {
     // May not be loaded
   }
   execSync(`launchctl bootstrap system "${MACOS_PLIST_PATH}"`)
-  log.info('Installed macOS LaunchDaemon schedule')
+  log.info(`Installed macOS LaunchDaemon schedule (daily at 9:${String(minute).padStart(2, '0')} AM)`)
 }
 
 function uninstallMacOSSchedule(): void {
@@ -83,11 +90,12 @@ ExecStart=${binaryPath} setup
 WantedBy=multi-user.target
 `
 
+  const minute = randomMinute()
   const timer = `[Unit]
 Description=Daily Glean MDM
 
 [Timer]
-OnCalendar=daily
+OnCalendar=*-*-* 09:${String(minute).padStart(2, '0')}:00
 Persistent=true
 
 [Install]
@@ -98,7 +106,7 @@ WantedBy=timers.target
   writeFileSync(LINUX_TIMER_PATH, timer)
   execSync('systemctl daemon-reload')
   execSync('systemctl enable --now glean-mdm.timer')
-  log.info('Installed systemd timer schedule')
+  log.info(`Installed systemd timer schedule (daily at 9:${String(minute).padStart(2, '0')} AM)`)
 }
 
 function uninstallLinuxSchedule(): void {
@@ -129,8 +137,13 @@ function uninstallLinuxSchedule(): void {
 
 function installWindowsSchedule(): void {
   const binaryPath = getBinaryInstallPath()
-  execFileSync('schtasks', schtasksCreateArgs(binaryPath))
-  log.info('Installed Windows Task Scheduler schedule')
+  const minute = randomMinute()
+  execFileSync('schtasks', schtasksCreateArgs(binaryPath, minute))
+  // Enable catch-up: run the task if a scheduled run was missed while the machine was off
+  execSync(
+    `powershell -Command "$t = Get-ScheduledTask '${WINDOWS_TASK_NAME}'; $t.Settings.StartWhenAvailable = $true; $t | Set-ScheduledTask"`,
+  )
+  log.info(`Installed Windows Task Scheduler schedule (daily at 9:${String(minute).padStart(2, '0')} AM)`)
 }
 
 function uninstallWindowsSchedule(): void {

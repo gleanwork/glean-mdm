@@ -6,7 +6,7 @@ describe('schtasksCreateArgs', () => {
   it('passes the binary path as a single argv element (paths with spaces)', () => {
     const pathWithSpaces = 'C:\\Program Files\\Glean\\glean-mdm.exe'
 
-    expect(schtasksCreateArgs(pathWithSpaces)).toEqual([
+    expect(schtasksCreateArgs(pathWithSpaces, 7)).toEqual([
       '/Create',
       '/TN',
       'Glean MDM',
@@ -15,10 +15,20 @@ describe('schtasksCreateArgs', () => {
       '/SC',
       'DAILY',
       '/ST',
-      '09:00',
+      '09:07',
       '/RU',
       'SYSTEM',
       '/F',
     ])
+  })
+
+  it('zero-pads single-digit minutes', () => {
+    const args = schtasksCreateArgs('C:\\glean-mdm.exe', 3)
+    expect(args).toContain('09:03')
+  })
+
+  it('does not pad two-digit minutes', () => {
+    const args = schtasksCreateArgs('C:\\glean-mdm.exe', 45)
+    expect(args).toContain('09:45')
   })
 })

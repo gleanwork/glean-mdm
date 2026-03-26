@@ -81,8 +81,10 @@ sudo glean-mdm uninstall
 
 ## Schedule details by platform
 
-| Platform | Mechanism | Schedule | Runs as |
-|----------|-----------|----------|---------|
-| macOS | LaunchDaemon (`/Library/LaunchDaemons/com.glean.mdm.plist`) | Daily at 9:00 AM + on load | root |
-| Linux | systemd timer (`glean-mdm.timer` / `glean-mdm.service`) | Daily | root |
-| Windows | Task Scheduler (`Glean MDM`) | Daily at 9:00 AM | SYSTEM |
+| Platform | Mechanism | Schedule | Missed run? | Runs as |
+|----------|-----------|----------|-------------|---------|
+| macOS | LaunchDaemon (`/Library/LaunchDaemons/com.glean.mdm.plist`) | Daily at 9:XX AM + on load | Runs on next boot/wake | root |
+| Linux | systemd timer (`glean-mdm.timer` / `glean-mdm.service`) | Daily at 9:XX AM | Runs on next boot (`Persistent=true`) | root |
+| Windows | Task Scheduler (`Glean MDM`) | Daily at 9:XX AM | Runs when available (`StartWhenAvailable`) | SYSTEM |
+
+> **Note:** The minute (XX) is randomized per-machine at install time to stagger requests to the version endpoint.
