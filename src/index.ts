@@ -2,6 +2,7 @@ import { ZodError } from 'zod'
 
 import { getServerUrl, readMcpConfig, readMdmConfig } from './config.js'
 import { writeConfig } from './config-writer.js'
+import { installExtensions } from './extensions/index.js'
 import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
@@ -255,7 +256,30 @@ async function main(): Promise<void> {
     }
   }
 
-  log.info(`Done: ${totalSuccess} configured, ${totalFailure} failed`)
+  log.info(`Hosts: ${totalSuccess} configured, ${totalFailure} failed`)
+
+  let extensionSuccess = 0
+  let extensionFailure = 0
+
+  for (const user of users) {
+    log.info(`Installing extensions for ${user.username} (${user.homeDir})`)
+
+    const extResults = installExtensions({
+      dryRun: args.dryRun,
+      gid: user.gid,
+      uid: user.uid,
+      userHomeDir: user.homeDir,
+      username: user.username,
+    })
+
+    for (const result of extResults) {
+      if (result.skipped) continue
+      if (result.success) extensionSuccess++
+      else extensionFailure++
+    }
+  }
+
+  log.info(`Extensions: ${extensionSuccess} installed, ${extensionFailure} failed`)
 
   if (totalFailure > 0) {
     process.exit(1)
