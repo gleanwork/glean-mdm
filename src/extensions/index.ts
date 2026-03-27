@@ -110,7 +110,7 @@ export function findEditorCli(editorId: string, candidates: string[], platform: 
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'ignore'],
     })
-    const found = result.trim().split('\n')[0]
+    const found = result.trim().split('\n')[0].trim()
     if (found && existsSync(found)) return found
   } catch {
     // Not on PATH
@@ -119,23 +119,26 @@ export function findEditorCli(editorId: string, candidates: string[], platform: 
   return null
 }
 
-export function cleanOldExtensions(extensionsDir: string): void {
+export function findOldExtensionDirs(extensionsDir: string): string[] {
   let entries: string[]
   try {
     entries = readdirSync(extensionsDir)
   } catch {
-    return // Directory doesn't exist
+    return []
   }
 
-  for (const entry of entries) {
-    if (entry.startsWith('glean.glean-')) {
-      const fullPath = join(extensionsDir, entry)
-      try {
-        rmSync(fullPath, { recursive: true, force: true })
-        log.info(`Removed old extension: ${fullPath}`)
-      } catch (err) {
-        log.warn(`Failed to remove old extension ${fullPath}: ${err}`)
-      }
+  return entries
+    .filter((entry) => entry.startsWith('glean.glean-'))
+    .map((entry) => join(extensionsDir, entry))
+}
+
+export function removeExtensionDirs(dirs: string[]): void {
+  for (const dir of dirs) {
+    try {
+      rmSync(dir, { recursive: true, force: true })
+      log.info(`Removed old extension: ${dir}`)
+    } catch (err) {
+      log.warn(`Failed to remove old extension ${dir}: ${err}`)
     }
   }
 }
@@ -143,10 +146,11 @@ export function cleanOldExtensions(extensionsDir: string): void {
 function runInstallExtension(
   cliPath: string,
   username: string,
+  extensionsDir: string,
   platform: Platform,
 ): void {
   if (platform === 'win32') {
-    execFileSync(cliPath, ['--install-extension', EXTENSION_ID], {
+    execFileSync(cliPath, ['--install-extension', EXTENSION_ID, '--extensions-dir', extensionsDir], {
       stdio: 'pipe',
       timeout: INSTALL_TIMEOUT_MS,
     })
@@ -182,8 +186,9 @@ export function installExtensions(options: InstallExtensionsOptions): ExtensionI
 
     try {
       const extensionsDir = join(userHomeDir, editor.extensionsDirName, 'extensions')
-      cleanOldExtensions(extensionsDir)
-      runInstallExtension(cliPath, username, platform)
+      const oldDirs = findOldExtensionDirs(extensionsDir)
+      runInstallExtension(cliPath, username, extensionsDir, platform)
+      removeExtensionDirs(oldDirs)
       log.info(`Installed extension for ${editor.id} via ${cliPath}`)
       results.push({ editor: editor.id, success: true })
     } catch (err) {
