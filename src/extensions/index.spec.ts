@@ -79,3 +79,73 @@ describe('removeExtensionDirs', () => {
     expect(() => removeExtensionDirs([join(tempDir, 'nonexistent')])).not.toThrow()
   })
 })
+
+describe('stale dir filtering', () => {
+  it('preserves the current version on no-op install', () => {
+    // User already has v1.0.0, CLI returns success without changes
+    const extensionsDir = join(tempDir, 'extensions')
+    mkdirSync(extensionsDir)
+    mkdirSync(join(extensionsDir, 'glean.glean-1.0.0'))
+
+    const oldDirs = new Set(findOldExtensionDirs(extensionsDir))
+    // No-op install: nothing changes on disk
+    const currentDirs = new Set(findOldExtensionDirs(extensionsDir))
+    const newDirs = [...currentDirs].filter((d) => !oldDirs.has(d))
+
+    if (newDirs.length > 0) {
+      const staleDirs = [...oldDirs].filter((d) => currentDirs.has(d))
+      removeExtensionDirs(staleDirs)
+    }
+
+    const remaining = readdirSync(extensionsDir)
+    expect(remaining).toEqual(['glean.glean-1.0.0'])
+  })
+
+  it('removes old version when upgrade adds a new version dir', () => {
+    // Before install: v1.0.0, after install: v1.0.0 + v2.0.0 (CLI didn't clean up)
+    const extensionsDir = join(tempDir, 'extensions')
+    mkdirSync(extensionsDir)
+    mkdirSync(join(extensionsDir, 'glean.glean-1.0.0'))
+
+    const oldDirs = new Set(findOldExtensionDirs(extensionsDir))
+
+    // Simulate upgrade: CLI adds new version but doesn't remove old
+    mkdirSync(join(extensionsDir, 'glean.glean-2.0.0'))
+
+    const currentDirs = new Set(findOldExtensionDirs(extensionsDir))
+    const newDirs = [...currentDirs].filter((d) => !oldDirs.has(d))
+
+    if (newDirs.length > 0) {
+      const staleDirs = [...oldDirs].filter((d) => currentDirs.has(d))
+      removeExtensionDirs(staleDirs)
+    }
+
+    const remaining = readdirSync(extensionsDir)
+    expect(remaining).toEqual(['glean.glean-2.0.0'])
+  })
+
+  it('handles upgrade where CLI already cleaned old version', () => {
+    // Before install: v1.0.0, after install: only v2.0.0 (CLI cleaned up)
+    const extensionsDir = join(tempDir, 'extensions')
+    mkdirSync(extensionsDir)
+    mkdirSync(join(extensionsDir, 'glean.glean-1.0.0'))
+
+    const oldDirs = new Set(findOldExtensionDirs(extensionsDir))
+
+    // Simulate upgrade: CLI removes old and adds new
+    const { rmSync } = require('node:fs')
+    rmSync(join(extensionsDir, 'glean.glean-1.0.0'), { recursive: true })
+    mkdirSync(join(extensionsDir, 'glean.glean-2.0.0'))
+
+    const currentDirs = new Set(findOldExtensionDirs(extensionsDir))
+    const newDirs = [...currentDirs].filter((d) => !oldDirs.has(d))
+
+    if (newDirs.length > 0) {
+      const staleDirs = [...oldDirs].filter((d) => currentDirs.has(d))
+      removeExtensionDirs(staleDirs)
+    }
+
+    const remaining = readdirSync(extensionsDir)
+    expect(remaining).toEqual(['glean.glean-2.0.0'])
+  })
+})

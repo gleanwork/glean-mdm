@@ -186,9 +186,17 @@ export function installExtensions(options: InstallExtensionsOptions): ExtensionI
 
     try {
       const extensionsDir = join(userHomeDir, editor.extensionsDirName, 'extensions')
-      const oldDirs = findOldExtensionDirs(extensionsDir)
+      const oldDirs = new Set(findOldExtensionDirs(extensionsDir))
       runInstallExtension(cliPath, username, extensionsDir, platform)
-      removeExtensionDirs(oldDirs)
+      const currentDirs = new Set(findOldExtensionDirs(extensionsDir))
+      // Only clean old versions if the install actually added a new version dir.
+      // If no new dirs appeared (no-op / already current), keep everything to
+      // avoid deleting the user's only working copy.
+      const newDirs = [...currentDirs].filter((d) => !oldDirs.has(d))
+      if (newDirs.length > 0) {
+        const staleDirs = [...oldDirs].filter((d) => currentDirs.has(d))
+        removeExtensionDirs(staleDirs)
+      }
       log.info(`Installed extension for ${editor.id} via ${cliPath}`)
       results.push({ editor: editor.id, success: true })
     } catch (err) {
