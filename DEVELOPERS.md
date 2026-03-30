@@ -1,5 +1,41 @@
 # Developer Guide
 
+## Configuration files
+
+All paths are defined in `src/platform.ts`.
+
+### Config directory
+
+| Platform | Path |
+|----------|------|
+| macOS | `/Library/Application Support/Glean MDM` |
+| Linux | `/etc/glean_mdm` |
+| Windows | `C:\ProgramData\Glean MDM` |
+
+### MCP config
+
+| Platform | Path |
+|----------|------|
+| macOS | `/Library/Application Support/Glean MDM/mcp-config.json` |
+| Linux | `/etc/glean_mdm/mcp-config.json` |
+| Windows | `C:\ProgramData\Glean MDM\mcp-config.json` |
+
+### MDM config
+
+| Platform | Path |
+|----------|------|
+| macOS | `/Library/Application Support/Glean MDM/mdm-config.json` |
+| Linux | `/etc/glean_mdm/mdm-config.json` |
+| Windows | `C:\ProgramData\Glean MDM\mdm-config.json` |
+
+### Binary install path
+
+| Platform | Path |
+|----------|------|
+| macOS | `/usr/local/bin/glean-mdm` |
+| Linux | `/usr/local/bin/glean-mdm` |
+| Windows | `C:\Program Files\Glean\glean-mdm.exe` |
+
 ## Verifying the schedule
 
 After running `glean-mdm install-schedule`, use the following commands to verify the schedule is set up correctly.
