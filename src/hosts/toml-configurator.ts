@@ -5,13 +5,11 @@ import * as TOML from 'smol-toml'
 
 import { log } from '../logger.js'
 
+import { isPlainObject, withoutDuplicateUrls } from './utils.js'
+
 export interface ConfigureFileOptions {
   configToMerge: Record<string, unknown>
   filePath: string
-}
-
-function isPlainObject(val: unknown): val is Record<string, unknown> {
-  return typeof val === 'object' && val !== null && !Array.isArray(val)
 }
 
 export function configureTomlFile(options: ConfigureFileOptions): void {
@@ -26,7 +24,8 @@ export function configureTomlFile(options: ConfigureFileOptions): void {
 
   for (const [key, value] of Object.entries(configToMerge)) {
     if (isPlainObject(value) && isPlainObject(existing[key])) {
-      existing[key] = { ...existing[key], ...value }
+      const filtered = withoutDuplicateUrls(existing[key], value)
+      existing[key] = { ...existing[key], ...filtered }
     } else {
       existing[key] = value
     }
