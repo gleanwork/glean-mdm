@@ -1,4 +1,4 @@
-import { chownSync, mkdirSync } from 'node:fs'
+import { chownSync, lstatSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
 import { createGleanRegistry } from '@gleanwork/mcp-config-glean'
@@ -116,7 +116,9 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
       }
 
       if (currentPlatform !== 'win32' && uid !== undefined && gid !== undefined) {
-        chownSync(resolvedPath, uid, gid)
+        if (!lstatSync(resolvedPath).isSymbolicLink()) {
+          chownSync(resolvedPath, uid, gid)
+        }
         chownAncestors(resolvedPath, userHomeDir, uid, gid)
       }
 
