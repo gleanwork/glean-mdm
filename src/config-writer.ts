@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { McpConfigSchema, type McpServerEntry, MdmConfigSchema } from './config.js'
@@ -13,6 +13,14 @@ export interface WriteConfigOptions {
   binaryUrlPrefix: string
   pinnedVersion?: string
   outputDir?: string
+}
+
+function resolveWritePath(filePath: string): string {
+  try {
+    return realpathSync(filePath)
+  } catch {
+    return filePath
+  }
 }
 
 function readExistingMcpEntries(filePath: string): McpServerEntry[] {
@@ -52,16 +60,18 @@ export function writeConfig(options: WriteConfigOptions): void {
     log.info(`Skipped ${mcpPath} (entry "${newEntry.serverName}" already exists)`)
   } else {
     const merged = [...existingEntries, newEntry]
-    const mcpTmp = `${mcpPath}.tmp`
+    const mcpWritePath = resolveWritePath(mcpPath)
+    const mcpTmp = `${mcpWritePath}.tmp`
     writeFileSync(mcpTmp, JSON.stringify(merged, null, 2) + '\n')
-    renameSync(mcpTmp, mcpPath)
+    renameSync(mcpTmp, mcpWritePath)
     log.info(`Added entry "${newEntry.serverName}" to ${mcpPath}`)
   }
 
   const mdmPath = join(outputDir, 'mdm-config.json')
-  const mdmTmp = `${mdmPath}.tmp`
+  const mdmWritePath = resolveWritePath(mdmPath)
+  const mdmTmp = `${mdmWritePath}.tmp`
   writeFileSync(mdmTmp, JSON.stringify(parsedMdm, null, 2) + '\n')
-  renameSync(mdmTmp, mdmPath)
+  renameSync(mdmTmp, mdmWritePath)
 
   log.info(`Wrote ${mdmPath}`)
 }

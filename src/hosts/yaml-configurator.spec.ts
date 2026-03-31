@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdtempSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -120,6 +120,44 @@ describe('configureYamlFile', () => {
     const secondRun = readFileSync(filePath, 'utf-8')
 
     expect(firstRun).toBe(secondRun)
+  })
+
+  it('preserves symlinks and updates the target file', () => {
+    const targetDir = mkdtempSync(join(tmpdir(), 'mdm-yaml-target-'))
+    const targetPath = join(targetDir, 'config.yaml')
+    writeFileSync(
+      targetPath,
+      YAML.stringify({
+        extensions: {
+          existing: { type: 'sse', uri: 'https://existing.com' },
+        },
+      }),
+    )
+
+    const symlinkPath = join(tempDir, 'config.yaml')
+    symlinkSync(targetPath, symlinkPath)
+
+    configureYamlFile({
+      configToMerge: {
+        extensions: {
+          glean_default: {
+            type: 'streamable_http',
+            uri: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath: symlinkPath,
+    })
+
+    expect(lstatSync(symlinkPath).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(symlinkPath)).toBe(targetPath)
+
+    const result = YAML.parse(readFileSync(targetPath, 'utf-8'))
+    expect(result.extensions.existing).toEqual({ type: 'sse', uri: 'https://existing.com' })
+    expect(result.extensions.glean_default).toEqual({
+      type: 'streamable_http',
+      uri: 'https://example-be.glean.com/mcp/default',
+    })
   })
 
   it('handles empty existing file', () => {

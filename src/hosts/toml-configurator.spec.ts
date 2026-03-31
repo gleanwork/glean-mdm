@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdtempSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -93,6 +93,44 @@ describe('configureTomlFile', () => {
 
     expect(result.mcp_servers.glean_default.url).toBe('https://new-be.glean.com/mcp/default')
     expect(result.mcp_servers.glean_default.type).toBe('http')
+  })
+
+  it('preserves symlinks and updates the target file', () => {
+    const targetDir = mkdtempSync(join(tmpdir(), 'mdm-toml-target-'))
+    const targetPath = join(targetDir, 'config.toml')
+    writeFileSync(
+      targetPath,
+      TOML.stringify({
+        mcp_servers: {
+          existing: { type: 'sse', url: 'https://existing.com' },
+        },
+      }),
+    )
+
+    const symlinkPath = join(tempDir, 'config.toml')
+    symlinkSync(targetPath, symlinkPath)
+
+    configureTomlFile({
+      configToMerge: {
+        mcp_servers: {
+          glean_default: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath: symlinkPath,
+    })
+
+    expect(lstatSync(symlinkPath).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(symlinkPath)).toBe(targetPath)
+
+    const result = TOML.parse(readFileSync(targetPath, 'utf-8')) as Record<string, Record<string, Record<string, string>>>
+    expect(result.mcp_servers.existing).toEqual({ type: 'sse', url: 'https://existing.com' })
+    expect(result.mcp_servers.glean_default).toEqual({
+      type: 'http',
+      url: 'https://example-be.glean.com/mcp/default',
+    })
   })
 
   it('is idempotent', () => {

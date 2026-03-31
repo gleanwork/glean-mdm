@@ -5,7 +5,7 @@ import YAML from 'yaml'
 
 import { log } from '../logger.js'
 
-import { isPlainObject, withoutDuplicateUrls } from './utils.js'
+import { isPlainObject, resolveWritePath, withoutDuplicateUrls } from './utils.js'
 
 export interface ConfigureFileOptions {
   configToMerge: Record<string, unknown>
@@ -32,10 +32,11 @@ export function configureYamlFile(options: ConfigureFileOptions): void {
     }
   }
 
-  mkdirSync(dirname(filePath), { recursive: true })
-  const tmpPath = `${filePath}.tmp`
+  const writePath = resolveWritePath(filePath)
+  mkdirSync(dirname(writePath), { recursive: true })
+  const tmpPath = `${writePath}.tmp`
   writeFileSync(tmpPath, YAML.stringify(existing))
-  renameSync(tmpPath, filePath)
+  renameSync(tmpPath, writePath)
 
   log.info(`Configured YAML: ${filePath}`)
 }
