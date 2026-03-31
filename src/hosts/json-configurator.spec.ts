@@ -175,6 +175,86 @@ describe('configureJsonFile', () => {
     })
   })
 
+  it('skips a new server entry when the same URL already exists under a different name', () => {
+    const filePath = join(tempDir, 'mcp.json')
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        mcpServers: {
+          glean: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          glean_default: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+    expect(result.mcpServers).toEqual({
+      glean: {
+        type: 'http',
+        url: 'https://example-be.glean.com/mcp/default',
+      },
+    })
+  })
+
+  it('preserves existing duplicate URL entries without mutating them', () => {
+    const filePath = join(tempDir, 'mcp.json')
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        mcpServers: {
+          glean: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+          glean_old: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          glean_default: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+    expect(result.mcpServers).toEqual({
+      glean: {
+        type: 'http',
+        url: 'https://example-be.glean.com/mcp/default',
+      },
+      glean_old: {
+        type: 'http',
+        url: 'https://example-be.glean.com/mcp/default',
+      },
+    })
+  })
+
   it("creates parent directories if they don't exist", () => {
     const filePath = join(tempDir, 'nested', 'deep', 'mcp.json')
 

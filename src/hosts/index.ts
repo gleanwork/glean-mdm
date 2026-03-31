@@ -10,6 +10,7 @@ import { getPlatform } from '../platform.js'
 
 import { configureJsonFile } from './json-configurator.js'
 import { configureTomlFile } from './toml-configurator.js'
+import { isPlainObject } from './utils.js'
 import { configureYamlFile } from './yaml-configurator.js'
 
 export interface ConfigureHostsOptions {
@@ -45,10 +46,6 @@ function chownAncestors(filePath: string, stopAt: string, uid: number, gid: numb
     }
     dir = dirname(dir)
   }
-}
-
-function isPlainObject(val: unknown): val is Record<string, unknown> {
-  return typeof val === 'object' && val !== null && !Array.isArray(val)
 }
 
 function deepMergeServerConfigs(
