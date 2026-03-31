@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdtempSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -252,6 +252,44 @@ describe('configureJsonFile', () => {
         type: 'http',
         url: 'https://example-be.glean.com/mcp/default',
       },
+    })
+  })
+
+  it('preserves symlinks and updates the target file', () => {
+    const targetDir = mkdtempSync(join(tmpdir(), 'mdm-json-target-'))
+    const targetPath = join(targetDir, 'mcp.json')
+    writeFileSync(
+      targetPath,
+      JSON.stringify({
+        mcpServers: {
+          existing: { type: 'sse', url: 'https://existing.com' },
+        },
+      }),
+    )
+
+    const symlinkPath = join(tempDir, 'mcp.json')
+    symlinkSync(targetPath, symlinkPath)
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          glean_default: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath: symlinkPath,
+    })
+
+    expect(lstatSync(symlinkPath).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(symlinkPath)).toBe(targetPath)
+
+    const result = JSON.parse(readFileSync(targetPath, 'utf-8'))
+    expect(result.mcpServers.existing).toEqual({ type: 'sse', url: 'https://existing.com' })
+    expect(result.mcpServers.glean_default).toEqual({
+      type: 'http',
+      url: 'https://example-be.glean.com/mcp/default',
     })
   })
 

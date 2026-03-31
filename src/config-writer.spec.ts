@@ -1,4 +1,4 @@
-import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdtempSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -239,6 +239,48 @@ describe('writeConfig', () => {
     expect(mdm.autoUpdate).toBe(true)
     expect(mdm.versionUrl).toBe('https://example.com/version')
     expect(mdm.binaryUrlPrefix).toBe('https://example.com/binaries-v2')
+  })
+
+  it('preserves symlinks for mcp-config.json and mdm-config.json', () => {
+    const targetDir = mkdtempSync(join(tmpdir(), 'glean-mdm-target-'))
+
+    const mcpTarget = join(targetDir, 'mcp-config.json')
+    const mdmTarget = join(targetDir, 'mdm-config.json')
+    writeFileSync(
+      mcpTarget,
+      JSON.stringify([{ serverName: 'existing', url: 'https://existing.com/mcp' }]),
+    )
+    writeFileSync(mdmTarget, JSON.stringify({ autoUpdate: false, binaryUrlPrefix: 'https://old.com/binaries' }))
+
+    const mcpLink = join(outputDir, 'mcp-config.json')
+    const mdmLink = join(outputDir, 'mdm-config.json')
+    symlinkSync(mcpTarget, mcpLink)
+    symlinkSync(mdmTarget, mdmLink)
+
+    writeConfig({
+      serverName: 'glean_default',
+      serverUrl: 'https://example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    expect(lstatSync(mcpLink).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(mcpLink)).toBe(mcpTarget)
+    expect(lstatSync(mdmLink).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(mdmLink)).toBe(mdmTarget)
+
+    const mcp = JSON.parse(readFileSync(mcpTarget, 'utf-8'))
+    expect(mcp).toEqual([
+      { serverName: 'existing', url: 'https://existing.com/mcp' },
+      { serverName: 'glean_default', url: 'https://example.com/mcp/default' },
+    ])
+
+    const mdm = JSON.parse(readFileSync(mdmTarget, 'utf-8'))
+    expect(mdm).toEqual({
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+    })
   })
 
   it('appends multiple distinct servers across successive calls', () => {

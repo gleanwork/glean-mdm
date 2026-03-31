@@ -5,7 +5,7 @@ import * as TOML from 'smol-toml'
 
 import { log } from '../logger.js'
 
-import { isPlainObject, withoutDuplicateUrls } from './utils.js'
+import { isPlainObject, resolveWritePath, withoutDuplicateUrls } from './utils.js'
 
 export interface ConfigureFileOptions {
   configToMerge: Record<string, unknown>
@@ -31,10 +31,11 @@ export function configureTomlFile(options: ConfigureFileOptions): void {
     }
   }
 
-  mkdirSync(dirname(filePath), { recursive: true })
-  const tmpPath = `${filePath}.tmp`
+  const writePath = resolveWritePath(filePath)
+  mkdirSync(dirname(writePath), { recursive: true })
+  const tmpPath = `${writePath}.tmp`
   writeFileSync(tmpPath, TOML.stringify(existing))
-  renameSync(tmpPath, filePath)
+  renameSync(tmpPath, writePath)
 
   log.info(`Configured TOML: ${filePath}`)
 }
