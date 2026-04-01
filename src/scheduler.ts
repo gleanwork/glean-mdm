@@ -153,17 +153,13 @@ function installWindowsSchedule(): void {
 }
 
 function uninstallWindowsSchedule(): void {
-  let removed = false
   try {
     execSync(`schtasks /Delete /TN "${WINDOWS_TASK_NAME}" /F`, {
       stdio: 'ignore',
     })
-    removed = true
-  } catch {
-    // May not exist
-  }
-  if (removed) {
     log.info('Removed Windows Task Scheduler schedule')
+  } catch (error: unknown) {
+    log.error(`Failed to uninstall Windows schedule: ${error}`)
   }
 }
 
