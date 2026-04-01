@@ -1,5 +1,5 @@
 import { execFileSync, execSync } from 'node:child_process'
-import { unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs'
 
 import { log } from './logger.js'
 import { getBinaryInstallPath, getPlatform } from './platform.js'
@@ -61,6 +61,7 @@ function installMacOSSchedule(): void {
 }
 
 function uninstallMacOSSchedule(): void {
+  const existed = existsSync(MACOS_PLIST_PATH)
   try {
     execSync(`launchctl bootout system "${MACOS_PLIST_PATH}"`, { stdio: 'ignore' })
   } catch {
@@ -71,7 +72,9 @@ function uninstallMacOSSchedule(): void {
   } catch {
     // May not exist
   }
-  log.info('Removed macOS LaunchDaemon schedule')
+  if (existed) {
+    log.info('Removed macOS LaunchDaemon schedule')
+  }
 }
 
 function installLinuxSchedule(): void {
@@ -110,6 +113,7 @@ WantedBy=timers.target
 }
 
 function uninstallLinuxSchedule(): void {
+  const existed = existsSync(LINUX_SERVICE_PATH) || existsSync(LINUX_TIMER_PATH)
   try {
     execSync('systemctl disable --now glean-mdm.timer', {
       stdio: 'ignore',
@@ -132,7 +136,9 @@ function uninstallLinuxSchedule(): void {
   } catch {
     // Best effort
   }
-  log.info('Removed systemd timer schedule')
+  if (existed) {
+    log.info('Removed systemd timer schedule')
+  }
 }
 
 function installWindowsSchedule(): void {
@@ -147,14 +153,18 @@ function installWindowsSchedule(): void {
 }
 
 function uninstallWindowsSchedule(): void {
+  let removed = false
   try {
     execSync(`schtasks /Delete /TN "${WINDOWS_TASK_NAME}" /F`, {
       stdio: 'ignore',
     })
+    removed = true
   } catch {
     // May not exist
   }
-  log.info('Removed Windows Task Scheduler schedule')
+  if (removed) {
+    log.info('Removed Windows Task Scheduler schedule')
+  }
 }
 
 export function installSchedule(): void {
