@@ -118,6 +118,16 @@ bun run src/index.ts -- run --dry-run --mcp-config ci/smoke-dry-run-mcp-config.j
 ./build.sh
 ```
 
+## Logs
+
+Structured logs are written to the platform log file below and rotated by truncation once the file exceeds 10MB.
+
+| Platform | Log path |
+|----------|----------|
+| macOS | `/var/log/glean-mdm.log` |
+| Linux | `/var/log/glean-mdm.log` |
+| Windows | `C:\ProgramData\Glean MDM\glean-mdm.log` |
+
 ## Releasing
 
 Push a version tag to trigger the release workflow:

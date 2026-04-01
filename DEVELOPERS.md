@@ -51,6 +51,9 @@ sudo launchctl list | grep glean
 
 # Get detailed status
 sudo launchctl print system/com.glean.mdm
+
+# Force an immediate run for local testing
+sudo launchctl kickstart -k system/com.glean.mdm
 ```
 
 Expected output from `sudo launchctl list | grep glean`:
@@ -88,7 +91,7 @@ schtasks /Query /TN "Glean MDM"
 
 ## Logs
 
-All platforms log to both stdout and a log file. The log file rotates automatically when it exceeds 10MB (the file gets truncated).
+All platforms write structured logs to a platform log file. The log file rotates automatically when it exceeds 10MB (the file gets truncated).
 
 | Platform | Log path |
 |----------|----------|
@@ -96,7 +99,7 @@ All platforms log to both stdout and a log file. The log file rotates automatica
 | Linux | `/var/log/glean-mdm.log` |
 | Windows | `C:\ProgramData\Glean MDM\glean-mdm.log` |
 
-On macOS, the LaunchDaemon's stdout/stderr is also configured to write to `/var/log/glean-mdm.log`, so everything ends up in one place.
+On macOS, `/var/log/glean-mdm.log` is written by the app logger directly. The LaunchDaemon does not redirect stdout/stderr into that file.
 
 To tail logs:
 
