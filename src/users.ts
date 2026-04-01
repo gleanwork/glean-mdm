@@ -106,3 +106,29 @@ export function lookupUser(username: string): UserInfo | undefined {
   const users = enumerateUsers()
   return users.find((u) => u.username === username)
 }
+
+/**
+ * Returns a set of usernames that have active login sessions.
+ * On macOS/Linux this parses `who` output; on Windows all users are
+ * considered active (sudo is not used there).
+ */
+export function getActiveSessionUsers(): Set<string> {
+  const platform = getPlatform()
+  if (platform === 'win32') {
+    // Windows extension installs don't use sudo, so session state is irrelevant
+    return new Set(getWindowsUsers().map((u) => u.username))
+  }
+
+  try {
+    const output = execSync('who', { encoding: 'utf-8', timeout: 5_000 })
+    const users = new Set<string>()
+    for (const line of output.trim().split('\n')) {
+      const username = line.trim().split(/\s+/)[0]
+      if (username) users.add(username)
+    }
+    return users
+  } catch {
+    // If `who` fails, return empty set — caller should treat all users as active
+    return new Set()
+  }
+}

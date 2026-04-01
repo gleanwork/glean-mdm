@@ -7,7 +7,7 @@ import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
 import { checkForUpdate } from './updater.js'
-import { enumerateUsers, lookupUser } from './users.js'
+import { enumerateUsers, getActiveSessionUsers, lookupUser } from './users.js'
 import { BUILD_VERSION } from './version.js'
 
 export interface CliOptions {
@@ -261,7 +261,17 @@ async function main(): Promise<void> {
   let extensionSuccess = 0
   let extensionFailure = 0
 
+  const activeUsers = getActiveSessionUsers()
+  if (activeUsers.size === 0) {
+    log.warn('Could not determine active sessions; installing extensions for all users')
+  }
+
   for (const user of users) {
+    if (activeUsers.size > 0 && !activeUsers.has(user.username)) {
+      log.info(`Skipping extensions for ${user.username} (no active session)`)
+      continue
+    }
+
     log.info(`Installing extensions for ${user.username} (${user.homeDir})`)
 
     const extResults = installExtensions({
