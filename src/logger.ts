@@ -21,17 +21,12 @@ export function initLogger(path?: string): void {
 function write(level: string, message: string): void {
   const timestamp = new Date().toISOString()
   const line = `[${timestamp}] [${level}] ${message}\n`
-  if (process.stdout.isTTY) {
-    process.stdout.write(line)
-  }
+  process.stdout.write(line)
   if (logFilePath) {
     try {
       appendFileSync(logFilePath, line)
     } catch {
-      // Can't write to log file, fall back to stdout
-      if (!process.stdout.isTTY) {
-        process.stdout.write(line)
-      }
+      // Can't write to log file, stdout is enough
     }
   }
 }

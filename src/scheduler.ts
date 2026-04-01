@@ -44,9 +44,9 @@ function installMacOSSchedule(): void {
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/var/log/glean-mdm.log</string>
+    <string>/dev/null</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/glean-mdm.log</string>
+    <string>/dev/null</string>
 </dict>
 </plist>`
 
