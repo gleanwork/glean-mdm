@@ -20,10 +20,8 @@ export function schtasksCreateArgs(binaryPath: string, minute: number): string[]
   return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', `${binaryPath} run`, '/SC', 'DAILY', '/ST', startTime, '/RU', 'SYSTEM', '/F']
 }
 
-function installMacOSSchedule(): void {
-  const binaryPath = getBinaryInstallPath()
-  const minute = randomMinute()
-  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+export function buildMacOSPlist(binaryPath: string, minute: number): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -43,12 +41,14 @@ function installMacOSSchedule(): void {
     </dict>
     <key>RunAtLoad</key>
     <true/>
-    <key>StandardOutPath</key>
-    <string>/var/log/glean-mdm.log</string>
-    <key>StandardErrorPath</key>
-    <string>/var/log/glean-mdm.log</string>
 </dict>
 </plist>`
+}
+
+function installMacOSSchedule(): void {
+  const binaryPath = getBinaryInstallPath()
+  const minute = randomMinute()
+  const plist = buildMacOSPlist(binaryPath, minute)
 
   writeFileSync(MACOS_PLIST_PATH, plist)
   try {
