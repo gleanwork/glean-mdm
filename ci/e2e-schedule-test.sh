@@ -291,5 +291,12 @@ $SUDO "$INSTALL_PATH" uninstall-schedule > "$RUN_OUTPUT" 2>&1 || {
 tr -d '\r' < "$RUN_OUTPUT"
 echo "PASS [uninstall-idempotent]: Second uninstall-schedule succeeded without error"
 
+# Verify removal message is NOT logged when schedule was already gone
+if tr -d '\r' < "$RUN_OUTPUT" | grep -q "$EXPECTED_REMOVE_MSG"; then
+  echo "FAIL [no-redundant-msg]: '$EXPECTED_REMOVE_MSG' should not appear when schedule already removed"
+  exit 1
+fi
+echo "PASS [no-redundant-msg]: No redundant removal message on idempotent run"
+
 echo ""
 echo "PASS: All E2E schedule tests succeeded"
