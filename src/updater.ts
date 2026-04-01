@@ -12,7 +12,26 @@ interface VersionInfo {
   version: string
 }
 
+const MAX_RETRIES = 1
+const RETRY_DELAY_MS = 5000
 const VERSION_PREFIX = /^v/
+
+async function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+export async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetch(url)
+    } catch (err) {
+      if (attempt === retries) throw err
+      log.warn(`Fetch failed (attempt ${attempt + 1}/${retries + 1}): ${err}. Retrying in ${RETRY_DELAY_MS}ms...`)
+      await delay(RETRY_DELAY_MS)
+    }
+  }
+  throw new Error('Retry loop exited unexpectedly')
+}
 
 export function compareVersions(a: string, b: string): number {
   const partsA = a.replace(VERSION_PREFIX, '').split('.').map(Number)
@@ -53,7 +72,7 @@ export async function checkForUpdate(versionUrl: string, binaryUrlPrefix: string
     let versionInfo: VersionInfo
     log.info(`Fetching version info from ${versionUrl}`)
     try {
-      const response = await fetch(versionUrl)
+      const response = await fetchWithRetry(versionUrl)
       if (!response.ok) {
         const body = await response.text().catch(() => '<no body>')
         log.warn(`Update check returned HTTP ${response.status}: ${body}`)
@@ -87,7 +106,7 @@ export async function checkForUpdate(versionUrl: string, binaryUrlPrefix: string
   try {
     const binaryUrl = getBinaryUrl(binaryUrlPrefix, target, targetVersion)
     log.info(`Downloading binary from ${binaryUrl}`)
-    const response = await fetch(binaryUrl)
+    const response = await fetchWithRetry(binaryUrl)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const buffer = Buffer.from(await response.arrayBuffer())
     writeFileSync(tmpPath, buffer, { mode: 0o600 })

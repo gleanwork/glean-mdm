@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { compareVersions, shouldUpdate } from './updater'
+import { compareVersions, fetchWithRetry, shouldUpdate } from './updater'
 
 describe('compareVersions', () => {
   it('returns 0 for equal versions', () => {
@@ -70,5 +70,61 @@ describe('shouldUpdate', () => {
   it('ignores server version when pinned version is set', () => {
     expect(shouldUpdate('1.2.3', '3.0.0', '1.2.3')).toBe(false)
     expect(shouldUpdate('1.0.0', '3.0.0', '1.2.3')).toBe(true)
+  })
+})
+
+describe('fetchWithRetry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('returns response on first success', async () => {
+    const mockResponse = new Response('ok', { status: 200 })
+    vi.mocked(fetch).mockResolvedValueOnce(mockResponse)
+
+    const result = await fetchWithRetry('https://example.com')
+
+    expect(result).toBe(mockResponse)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries on network error and eventually succeeds', async () => {
+    const mockResponse = new Response('ok', { status: 200 })
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Connection reset')).mockResolvedValueOnce(mockResponse)
+
+    const promise = fetchWithRetry('https://example.com')
+    await vi.advanceTimersByTimeAsync(5000)
+    const result = await promise
+
+    expect(result).toBe(mockResponse)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('throws after exhausting retries', async () => {
+    const error = new Error('Connection reset')
+    vi.mocked(fetch).mockRejectedValueOnce(error).mockRejectedValueOnce(error)
+
+    const promise = fetchWithRetry('https://example.com')
+    const assertion = expect(promise).rejects.toThrow('Connection reset')
+    await vi.advanceTimersByTimeAsync(5000)
+
+    await assertion
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry on HTTP error responses', async () => {
+    const mockResponse = new Response('Not Found', { status: 404 })
+    vi.mocked(fetch).mockResolvedValueOnce(mockResponse)
+
+    const result = await fetchWithRetry('https://example.com')
+
+    expect(result).toBe(mockResponse)
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 })
