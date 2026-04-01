@@ -108,11 +108,12 @@ export function lookupUser(username: string): UserInfo | undefined {
 }
 
 /**
- * Returns a set of usernames that have active login sessions.
+ * Returns a set of usernames that have active login sessions, or `null` if
+ * session state could not be determined (e.g. `who` command failed).
  * On macOS/Linux this parses `who` output; on Windows all users are
  * considered active (sudo is not used there).
  */
-export function getActiveSessionUsers(): Set<string> {
+export function getActiveSessionUsers(): Set<string> | null {
   const platform = getPlatform()
   if (platform === 'win32') {
     // Windows extension installs don't use sudo, so session state is irrelevant
@@ -128,7 +129,8 @@ export function getActiveSessionUsers(): Set<string> {
     }
     return users
   } catch {
-    // If `who` fails, return empty set — caller should treat all users as active
-    return new Set()
+    // If `who` fails, return null so the caller can distinguish failure from
+    // a successful check that found no active sessions.
+    return null
   }
 }

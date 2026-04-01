@@ -262,12 +262,12 @@ async function main(): Promise<void> {
   let extensionFailure = 0
 
   const activeUsers = getActiveSessionUsers()
-  if (activeUsers.size === 0) {
+  if (activeUsers === null) {
     log.warn('Could not determine active sessions; installing extensions for all users')
   }
 
   for (const user of users) {
-    if (activeUsers.size > 0 && !activeUsers.has(user.username)) {
+    if (activeUsers !== null && !activeUsers.has(user.username)) {
       log.info(`Skipping extensions for ${user.username} (no active session)`)
       continue
     }
