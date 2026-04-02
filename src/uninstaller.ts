@@ -24,14 +24,6 @@ export function fullUninstall(options: UninstallOptions = {}): void {
     }
   }
 
-  const logFile = getLogFilePath()
-  try {
-    unlinkSync(logFile)
-    log.info(`Removed log file: ${logFile}`)
-  } catch {
-    // May not exist
-  }
-
   const binaryPath = getBinaryInstallPath()
   if (getPlatform() === 'win32') {
     spawn('cmd', ['/c', `ping -n 3 127.0.0.1 > nul & del "${binaryPath}"`], {
@@ -49,4 +41,11 @@ export function fullUninstall(options: UninstallOptions = {}): void {
   }
 
   log.info('Uninstall complete')
+
+  // Delete log file last so earlier steps can still write to it
+  try {
+    unlinkSync(getLogFilePath())
+  } catch {
+    // May not exist
+  }
 }

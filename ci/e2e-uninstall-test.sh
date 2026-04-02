@@ -88,6 +88,7 @@ case "$(uname -s)" in
     ;;
   MINGW*|MSYS*|CYGWIN*)
     mkdir -p "$INSTALL_DIR"
+    mkdir -p "$CONFIG_DIR"
     touch "$LOG_FILE"
     ;;
 esac
