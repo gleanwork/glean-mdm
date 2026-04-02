@@ -6,6 +6,7 @@ import { installExtensions } from './extensions/index.js'
 import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
+import { fullUninstall } from './uninstaller.js'
 import { checkForUpdate } from './updater.js'
 import { enumerateUsers, getActiveSessionUsers, lookupUser } from './users.js'
 import { BUILD_VERSION } from './version.js'
@@ -26,6 +27,7 @@ export interface CliOptions {
   binaryUrlPrefix?: string
   pinnedVersion?: string
   outputDir?: string
+  keepConfig?: boolean
 }
 
 export function parseArgs(args: string[]): CliOptions {
@@ -99,6 +101,9 @@ export function parseArgs(args: string[]): CliOptions {
       case '--output-dir':
         options.outputDir = args[++i]
         break
+      case '--keep-config':
+        options.keepConfig = true
+        break
     }
   }
 
@@ -118,7 +123,7 @@ Commands:
   config              Generate mcp-config.json and mdm-config.json files
   install-schedule    Install system scheduled task (launchd/systemd/Task Scheduler)
   uninstall-schedule  Remove system scheduled task
-  uninstall           Uninstall (removes schedule; binary/config must be removed manually)
+  uninstall           Full uninstall (removes schedule, config, logs, and binary)
 
 Flags:
   -h, --help              Show this help message
@@ -128,6 +133,9 @@ Flags:
       --skip-update       Skip binary self-update check
       --mcp-config <path> Custom path to MCP config file
       --mdm-config <path> Custom path to MDM config file
+
+Uninstall flags (used with 'uninstall' command):
+      --keep-config           Preserve config files during uninstall
 
 Config flags (used with 'config' command):
       --server-name <name>        Identifier for the MCP server (required)
@@ -166,8 +174,7 @@ async function main(): Promise<void> {
     return
   }
   if (args.subcommand === 'uninstall') {
-    uninstallSchedule()
-    log.info('Uninstall complete (binary and config must be removed manually)')
+    fullUninstall({ keepConfig: args.keepConfig })
     return
   }
   if (args.subcommand === 'config') {
