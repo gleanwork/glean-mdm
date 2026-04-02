@@ -47,8 +47,8 @@ describe('shouldUpdate', () => {
     expect(shouldUpdate('1.0.0', '2.0.0')).toBe(true)
   })
 
-  it('returns false when current is newer than server', () => {
-    expect(shouldUpdate('2.0.0', '1.0.0')).toBe(false)
+  it('returns true when current is newer than server (downgrade)', () => {
+    expect(shouldUpdate('2.0.0', '1.0.0')).toBe(true)
   })
 
   it('returns false when current matches pinned version', () => {
@@ -59,8 +59,12 @@ describe('shouldUpdate', () => {
     expect(shouldUpdate('1.0.0', '2.0.0', '1.2.3')).toBe(true)
   })
 
-  it('returns false when current is ahead of pinned version', () => {
-    expect(shouldUpdate('2.0.0', '2.0.0', '1.2.3')).toBe(false)
+  it('returns true when current is ahead of pinned version (downgrade)', () => {
+    expect(shouldUpdate('2.0.0', '2.0.0', '1.2.3')).toBe(true)
+  })
+
+  it('returns true when current is ahead of pinned version with different server version', () => {
+    expect(shouldUpdate('3.0.0', '2.0.0', '1.2.3')).toBe(true)
   })
 
   it('handles v-prefix in pinned version', () => {

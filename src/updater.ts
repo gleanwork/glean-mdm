@@ -26,7 +26,7 @@ export function compareVersions(a: string, b: string): number {
 
 export function shouldUpdate(currentVersion: string, serverVersion: string, pinnedVersion?: string): boolean {
   const targetVersion = pinnedVersion ?? serverVersion
-  return compareVersions(currentVersion, targetVersion) < 0
+  return compareVersions(currentVersion, targetVersion) !== 0
 }
 
 function getBinaryUrl(binaryUrlPrefix: string, target: string, version: string): string {
@@ -44,7 +44,7 @@ export async function checkForUpdate(versionUrl: string, binaryUrlPrefix: string
   let expectedChecksum: string | undefined
 
   if (pinnedVersion) {
-    if (compareVersions(BUILD_VERSION, pinnedVersion) >= 0) {
+    if (compareVersions(BUILD_VERSION, pinnedVersion) === 0) {
       log.info(`Already at pinned version (${BUILD_VERSION})`)
       return false
     }
@@ -66,7 +66,7 @@ export async function checkForUpdate(versionUrl: string, binaryUrlPrefix: string
       return false
     }
 
-    if (compareVersions(BUILD_VERSION, versionInfo.version) >= 0) {
+    if (compareVersions(BUILD_VERSION, versionInfo.version) === 0) {
       log.info(`Already up to date (${BUILD_VERSION})`)
       return false
     }
