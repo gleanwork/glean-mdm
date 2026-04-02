@@ -26,7 +26,7 @@ export function fullUninstall(options: UninstallOptions = {}): void {
 
   const binaryPath = getBinaryInstallPath()
   if (getPlatform() === 'win32') {
-    spawn('cmd', ['/c', `ping -n 3 127.0.0.1 > nul & del "${binaryPath}"`], {
+    spawn('powershell', ['-Command', `Start-Sleep -Seconds 3; Remove-Item -Force '${binaryPath}'`], {
       detached: true,
       stdio: 'ignore',
     }).unref()

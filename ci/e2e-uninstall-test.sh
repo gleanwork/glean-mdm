@@ -177,7 +177,7 @@ echo "PASS [log-removed]: Log file removed"
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     # Wait briefly for the detached deletion process
-    sleep 5
+    sleep 10
     ;;
 esac
 if [ -f "$INSTALL_PATH" ]; then
@@ -234,7 +234,7 @@ echo "PASS [log-removed-keep-config]: Log file removed"
 # Binary should still be removed
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
-    sleep 5
+    sleep 10
     ;;
 esac
 if [ -f "$INSTALL_PATH" ]; then
