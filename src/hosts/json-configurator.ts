@@ -1,9 +1,8 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { readFileSync } from 'node:fs'
 
 import { log } from '../logger.js'
 
-import { isPlainObject, resolveWritePath, withoutDuplicateUrls } from './utils.js'
+import { isPlainObject, safeWriteFile, withoutDuplicateUrls } from './utils.js'
 
 export interface ConfigureFileOptions {
   configToMerge: Record<string, unknown>
@@ -29,11 +28,7 @@ export function configureJsonFile(options: ConfigureFileOptions): void {
     }
   }
 
-  const writePath = resolveWritePath(filePath)
-  mkdirSync(dirname(writePath), { recursive: true })
-  const tmpPath = `${writePath}.tmp`
-  writeFileSync(tmpPath, JSON.stringify(existing, null, 2) + '\n')
-  renameSync(tmpPath, writePath)
+  safeWriteFile(filePath, JSON.stringify(existing, null, 2) + '\n')
 
   log.info(`Configured JSON: ${filePath}`)
 }

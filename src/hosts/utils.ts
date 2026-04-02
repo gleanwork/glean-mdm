@@ -1,6 +1,24 @@
-import { realpathSync } from 'node:fs'
+import { mkdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 
 import { log } from '../logger.js'
+
+export function safeWriteFile(filePath: string, content: string): void {
+  const writePath = resolveWritePath(filePath)
+  mkdirSync(dirname(writePath), { recursive: true })
+  const tmpPath = `${writePath}.tmp`
+  try {
+    writeFileSync(tmpPath, content)
+    renameSync(tmpPath, writePath)
+  } catch {
+    writeFileSync(writePath, content)
+    try {
+      unlinkSync(tmpPath)
+    } catch {
+      // .tmp file may not exist if writeFileSync to tmpPath was the failure
+    }
+  }
+}
 
 export function resolveWritePath(filePath: string): string {
   try {

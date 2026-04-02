@@ -1,11 +1,10 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { readFileSync } from 'node:fs'
 
 import YAML from 'yaml'
 
 import { log } from '../logger.js'
 
-import { isPlainObject, resolveWritePath, withoutDuplicateUrls } from './utils.js'
+import { isPlainObject, safeWriteFile, withoutDuplicateUrls } from './utils.js'
 
 export interface ConfigureFileOptions {
   configToMerge: Record<string, unknown>
@@ -32,11 +31,7 @@ export function configureYamlFile(options: ConfigureFileOptions): void {
     }
   }
 
-  const writePath = resolveWritePath(filePath)
-  mkdirSync(dirname(writePath), { recursive: true })
-  const tmpPath = `${writePath}.tmp`
-  writeFileSync(tmpPath, YAML.stringify(existing))
-  renameSync(tmpPath, writePath)
+  safeWriteFile(filePath, YAML.stringify(existing))
 
   log.info(`Configured YAML: ${filePath}`)
 }

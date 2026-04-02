@@ -125,7 +125,7 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
       results.push({ host: client.displayName, success: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      log.error(`Failed to configure ${client.displayName}: ${message}`)
+      log.warn(`Failed to configure ${client.displayName}: ${message}`)
       results.push({ error: message, host: client.displayName, success: false })
     }
   }

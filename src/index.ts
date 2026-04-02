@@ -291,7 +291,7 @@ async function main(): Promise<void> {
 
   log.info(`Extensions: ${extensionSuccess} installed, ${extensionFailure} failed`)
 
-  if (totalFailure > 0 || extensionFailure > 0) {
+  if (extensionFailure > 0) {
     process.exit(1)
   }
 }
