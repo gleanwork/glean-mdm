@@ -1,5 +1,4 @@
-import { spawn } from 'node:child_process'
-import { rmSync, unlinkSync } from 'node:fs'
+import { renameSync, rmSync, unlinkSync } from 'node:fs'
 
 import { log } from './logger.js'
 import { getBinaryInstallPath, getDefaultConfigDir, getLogFilePath, getPlatform } from './platform.js'
@@ -26,11 +25,21 @@ export function fullUninstall(options: UninstallOptions = {}): void {
 
   const binaryPath = getBinaryInstallPath()
   if (getPlatform() === 'win32') {
-    spawn('powershell', ['-Command', `Start-Sleep -Seconds 3; Remove-Item -Force '${binaryPath}'`], {
-      detached: true,
-      stdio: 'ignore',
-    }).unref()
-    log.info(`Binary will be removed shortly: ${binaryPath}`)
+    // Windows locks running executables. Rename first (works on locked
+    // files), then best-effort delete — same approach as the updater.
+    const oldPath = `${binaryPath}.old`
+    try {
+      renameSync(binaryPath, oldPath)
+      log.info(`Renamed binary to ${oldPath}`)
+      try {
+        unlinkSync(oldPath)
+        log.info(`Removed binary: ${oldPath}`)
+      } catch {
+        log.warn(`Could not remove ${oldPath} (locked) — it will be cleaned up on next boot or update`)
+      }
+    } catch {
+      log.warn(`Could not remove binary: ${binaryPath}`)
+    }
   } else {
     try {
       unlinkSync(binaryPath)

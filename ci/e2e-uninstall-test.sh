@@ -173,18 +173,16 @@ if [ -f "$LOG_FILE" ]; then
 fi
 echo "PASS [log-removed]: Log file removed"
 
-# Verify binary removed (on Windows the binary is deleted asynchronously)
-case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*)
-    # Wait briefly for the detached deletion process
-    sleep 10
-    ;;
-esac
+# Verify binary removed (on Windows, the binary is renamed to .old since
+# Windows locks running executables — check that the original is gone)
 if [ -f "$INSTALL_PATH" ]; then
   echo "FAIL [binary-removed]: $INSTALL_PATH still exists after uninstall"
   exit 1
 fi
 echo "PASS [binary-removed]: Binary removed"
+
+# Clean up the .old file on Windows so later tests start fresh
+rm -f "${INSTALL_PATH}.old" 2>/dev/null || true
 
 # Verify output message
 if ! tr -d '\r' < "$RUN_OUTPUT" | grep -q "Uninstall complete"; then
@@ -232,11 +230,6 @@ fi
 echo "PASS [log-removed-keep-config]: Log file removed"
 
 # Binary should still be removed
-case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*)
-    sleep 10
-    ;;
-esac
 if [ -f "$INSTALL_PATH" ]; then
   echo "FAIL [binary-removed-keep-config]: $INSTALL_PATH still exists"
   exit 1
