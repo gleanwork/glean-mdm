@@ -14,10 +14,10 @@ export function randomMinute(): number {
   return Math.floor(Math.random() * 60)
 }
 
-/** Exposed for tests — argv array avoids shell quoting bugs when paths contain spaces. */
+/** Exposed for tests. The /TR value must quote paths with spaces for Task Scheduler. */
 export function schtasksCreateArgs(binaryPath: string, minute: number): string[] {
   const startTime = `09:${String(minute).padStart(2, '0')}`
-  return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', `${binaryPath} run`, '/SC', 'DAILY', '/ST', startTime, '/RU', 'SYSTEM', '/F']
+  return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', `"${binaryPath}" run`, '/SC', 'DAILY', '/ST', startTime, '/RU', 'SYSTEM', '/F']
 }
 
 export function buildMacOSPlist(binaryPath: string, minute: number): string {

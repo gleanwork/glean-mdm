@@ -29,7 +29,7 @@ describe('schtasksCreateArgs', () => {
       '/TN',
       'Glean MDM',
       '/TR',
-      `${pathWithSpaces} run`,
+      `"${pathWithSpaces}" run`,
       '/SC',
       'DAILY',
       '/ST',

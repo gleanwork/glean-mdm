@@ -186,6 +186,28 @@ case "$SCHEDULE_TYPE" in
       exit 1
     fi
     echo "PASS [task-exists]: Scheduled task '$TASK_NAME' created"
+
+    # Verify task action is correctly parsed (Execute and Arguments)
+    TASK_ACTION=$(powershell -Command "\$task = Get-ScheduledTask -TaskName '$TASK_NAME'; \$task.Actions[0] | Select-Object -Property Execute, Arguments | ConvertTo-Json -Compress")
+    EXPECTED_EXECUTE="C:\\Program Files\\Glean\\glean-mdm.exe"
+    EXPECTED_ARGUMENTS="run"
+
+    ACTUAL_EXECUTE=$(echo "$TASK_ACTION" | jq -r '.Execute')
+    ACTUAL_ARGUMENTS=$(echo "$TASK_ACTION" | jq -r '.Arguments')
+
+    if [ "$ACTUAL_EXECUTE" != "$EXPECTED_EXECUTE" ]; then
+      echo "FAIL [task-action]: Expected Execute='$EXPECTED_EXECUTE', got '$ACTUAL_EXECUTE'"
+      echo "Task Action: $TASK_ACTION"
+      exit 1
+    fi
+
+    if [ "$ACTUAL_ARGUMENTS" != "$EXPECTED_ARGUMENTS" ]; then
+      echo "FAIL [task-action]: Expected Arguments='$EXPECTED_ARGUMENTS', got '$ACTUAL_ARGUMENTS'"
+      echo "Task Action: $TASK_ACTION"
+      exit 1
+    fi
+
+    echo "PASS [task-action]: Task action correctly parsed (Execute='$EXPECTED_EXECUTE', Arguments='$EXPECTED_ARGUMENTS')"
     ;;
 esac
 
