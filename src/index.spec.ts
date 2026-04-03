@@ -62,6 +62,10 @@ describe('parseArgs', () => {
     expect(parseArgs(['uninstall']).subcommand).toBe('uninstall')
   })
 
+  it('parses --keep-config flag', () => {
+    expect(parseArgs(['uninstall', '--keep-config']).keepConfig).toBe(true)
+  })
+
   it('parses multiple flags together', () => {
     const result = parseArgs([
       '--dry-run',
