@@ -197,6 +197,10 @@ fi
 
 echo ""
 echo "=== Verify config file ownership ==="
+EXPECTED_OWNER="$(whoami)"
+OWNERSHIP_OK=true
+CHECKED=0
+
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     WIN_HOME=$(cygpath -w "$HOME")
@@ -204,8 +208,6 @@ case "$(uname -s)" in
       "(Get-Acl -LiteralPath '${WIN_HOME}').Owner" | tr -d '\r')
     echo "Expected owner: $EXPECTED_OWNER"
 
-    OWNERSHIP_OK=true
-    CHECKED=0
     # Deduplicate paths (some hosts share the same config file)
     while IFS= read -r f; do
       ACTUAL_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
@@ -218,18 +220,41 @@ case "$(uname -s)" in
         OWNERSHIP_OK=false
       fi
     done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
-
-    if [ "$OWNERSHIP_OK" = true ]; then
-      echo "PASS [ownership]: All $CHECKED config file(s) owned by $EXPECTED_OWNER"
-    else
-      echo "FAIL [ownership]: Some config files have incorrect ownership"
-      exit 1
-    fi
     ;;
-  *)
-    echo "SKIP [ownership]: Ownership verification is Windows-only"
+  Darwin)
+    echo "Expected owner: $EXPECTED_OWNER"
+    while IFS= read -r f; do
+      ACTUAL_OWNER=$(stat -f '%Su' "$f")
+      CHECKED=$((CHECKED + 1))
+      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
+        echo "  OK: $f"
+      else
+        echo "  FAIL: $f (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
+        OWNERSHIP_OK=false
+      fi
+    done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
+    ;;
+  Linux)
+    echo "Expected owner: $EXPECTED_OWNER"
+    while IFS= read -r f; do
+      ACTUAL_OWNER=$(stat -c '%U' "$f")
+      CHECKED=$((CHECKED + 1))
+      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
+        echo "  OK: $f"
+      else
+        echo "  FAIL: $f (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
+        OWNERSHIP_OK=false
+      fi
+    done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
     ;;
 esac
+
+if [ "$OWNERSHIP_OK" = true ]; then
+  echo "PASS [ownership]: All $CHECKED config file(s) owned by $EXPECTED_OWNER"
+else
+  echo "FAIL [ownership]: Some config files have incorrect ownership"
+  exit 1
+fi
 
 echo ""
 echo "=== Compute Run 1 checksums ==="
