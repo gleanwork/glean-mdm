@@ -1,82 +1,82 @@
 import { describe, it, expect } from 'vitest'
 
-import { parseArgs } from './index'
+import { buildCliOptions } from './index'
 
-describe('parseArgs', () => {
-  it('returns defaults with no arguments', () => {
-    const result = parseArgs([])
+describe('buildCliOptions', () => {
+  it('builds options for run command with no flags', () => {
+    const result = buildCliOptions('run', {})
 
     expect(result).toEqual({
+      subcommand: 'run',
       dryRun: false,
-      showHelp: false,
-      showVersion: false,
       skipUpdate: false,
+      singleUser: undefined,
+      mcpConfigPath: undefined,
+      mdmConfigPath: undefined,
+      serverName: undefined,
+      serverUrl: undefined,
+      autoUpdate: undefined,
+      versionUrl: undefined,
+      binaryUrlPrefix: undefined,
+      pinnedVersion: undefined,
+      outputDir: undefined,
+      keepConfig: false,
     })
   })
 
-  it('parses --help flag', () => {
-    expect(parseArgs(['--help']).showHelp).toBe(true)
+  it('builds options with global --dry-run flag', () => {
+    const result = buildCliOptions('run', { dryRun: true })
+    expect(result.dryRun).toBe(true)
   })
 
-  it('parses -h flag', () => {
-    expect(parseArgs(['-h']).showHelp).toBe(true)
+  it('builds options with global --skip-update flag', () => {
+    const result = buildCliOptions('run', { skipUpdate: true })
+    expect(result.skipUpdate).toBe(true)
   })
 
-  it('parses --version flag', () => {
-    expect(parseArgs(['--version']).showVersion).toBe(true)
+  it('builds options with --mcp-config path', () => {
+    const result = buildCliOptions('run', { mcpConfig: '/custom/mcp.json' })
+    expect(result.mcpConfigPath).toBe('/custom/mcp.json')
   })
 
-  it('parses --dry-run flag', () => {
-    expect(parseArgs(['--dry-run']).dryRun).toBe(true)
+  it('builds options with --mdm-config path', () => {
+    const result = buildCliOptions('run', { mdmConfig: '/custom/mdm.json' })
+    expect(result.mdmConfigPath).toBe('/custom/mdm.json')
   })
 
-  it('parses --skip-update flag', () => {
-    expect(parseArgs(['--skip-update']).skipUpdate).toBe(true)
+  it('builds options with --user username', () => {
+    const result = buildCliOptions('run', { user: 'alice' })
+    expect(result.singleUser).toBe('alice')
   })
 
-  it('parses --mcp-config with path', () => {
-    expect(parseArgs(['--mcp-config', '/custom/mcp.json']).mcpConfigPath).toBe('/custom/mcp.json')
+  it('builds options for install-schedule subcommand', () => {
+    const result = buildCliOptions('install-schedule', {})
+    expect(result.subcommand).toBe('install-schedule')
   })
 
-  it('parses --mdm-config with path', () => {
-    expect(parseArgs(['--mdm-config', '/custom/mdm.json']).mdmConfigPath).toBe('/custom/mdm.json')
+  it('builds options for uninstall-schedule subcommand', () => {
+    const result = buildCliOptions('uninstall-schedule', {})
+    expect(result.subcommand).toBe('uninstall-schedule')
   })
 
-  it('parses --user with username', () => {
-    expect(parseArgs(['--user', 'alice']).singleUser).toBe('alice')
+  it('builds options for uninstall subcommand', () => {
+    const result = buildCliOptions('uninstall', {})
+    expect(result.subcommand).toBe('uninstall')
   })
 
-  it('parses run subcommand', () => {
-    expect(parseArgs(['run']).subcommand).toBe('run')
+  it('builds options with --keep-config flag for uninstall', () => {
+    const result = buildCliOptions('uninstall', {}, { keepConfig: true })
+    expect(result.keepConfig).toBe(true)
   })
 
-  it('parses install-schedule subcommand', () => {
-    expect(parseArgs(['install-schedule']).subcommand).toBe('install-schedule')
-  })
-
-  it('parses uninstall-schedule subcommand', () => {
-    expect(parseArgs(['uninstall-schedule']).subcommand).toBe('uninstall-schedule')
-  })
-
-  it('parses uninstall subcommand', () => {
-    expect(parseArgs(['uninstall']).subcommand).toBe('uninstall')
-  })
-
-  it('parses --keep-config flag', () => {
-    expect(parseArgs(['uninstall', '--keep-config']).keepConfig).toBe(true)
-  })
-
-  it('parses multiple flags together', () => {
-    const result = parseArgs([
-      '--dry-run',
-      '--skip-update',
-      '--mcp-config',
-      '/etc/mcp.json',
-      '--mdm-config',
-      '/etc/mdm.json',
-      '--user',
-      'bob',
-    ])
+  it('builds options with multiple global flags together', () => {
+    const result = buildCliOptions('run', {
+      dryRun: true,
+      skipUpdate: true,
+      mcpConfig: '/etc/mcp.json',
+      mdmConfig: '/etc/mdm.json',
+      user: 'bob',
+    })
 
     expect(result.dryRun).toBe(true)
     expect(result.skipUpdate).toBe(true)
@@ -85,72 +85,65 @@ describe('parseArgs', () => {
     expect(result.singleUser).toBe('bob')
   })
 
-  it('ignores unknown flags', () => {
-    const result = parseArgs(['--unknown', '--dry-run'])
-
-    expect(result.dryRun).toBe(true)
-    expect(result.showVersion).toBe(false)
+  it('builds options for config subcommand', () => {
+    const result = buildCliOptions('config', {})
+    expect(result.subcommand).toBe('config')
   })
 
-  it('parses config subcommand', () => {
-    expect(parseArgs(['config']).subcommand).toBe('config')
+  it('builds options with --server-name value', () => {
+    const result = buildCliOptions('config', {}, { serverName: 'glean_default' })
+    expect(result.serverName).toBe('glean_default')
   })
 
-  it('parses --server-name with value', () => {
-    expect(parseArgs(['config', '--server-name', 'glean_default']).serverName).toBe('glean_default')
+  it('builds options with --server-url value', () => {
+    const result = buildCliOptions('config', {}, { serverUrl: 'https://example.com/mcp/default' })
+    expect(result.serverUrl).toBe('https://example.com/mcp/default')
   })
 
-  it('parses --server-url with value', () => {
-    expect(parseArgs(['config', '--server-url', 'https://example.com/mcp/default']).serverUrl).toBe(
-      'https://example.com/mcp/default',
-    )
+  it('builds options with --auto-update flag', () => {
+    const result = buildCliOptions('config', {}, { autoUpdate: true })
+    expect(result.autoUpdate).toBe(true)
   })
 
-  it('parses --auto-update flag', () => {
-    expect(parseArgs(['config', '--auto-update']).autoUpdate).toBe(true)
+  it('builds options with --no-auto-update flag', () => {
+    const result = buildCliOptions('config', {}, { autoUpdate: false })
+    expect(result.autoUpdate).toBe(false)
   })
 
-  it('parses --no-auto-update flag', () => {
-    expect(parseArgs(['config', '--no-auto-update']).autoUpdate).toBe(false)
+  it('builds options with --version-url value', () => {
+    const result = buildCliOptions('config', {}, { versionUrl: 'https://example.com/version' })
+    expect(result.versionUrl).toBe('https://example.com/version')
   })
 
-  it('parses --version-url with value', () => {
-    expect(parseArgs(['config', '--version-url', 'https://example.com/version']).versionUrl).toBe(
-      'https://example.com/version',
-    )
+  it('builds options with --binary-url-prefix value', () => {
+    const result = buildCliOptions('config', {}, { binaryUrlPrefix: 'https://example.com/binaries' })
+    expect(result.binaryUrlPrefix).toBe('https://example.com/binaries')
   })
 
-  it('parses --binary-url-prefix with value', () => {
-    expect(
-      parseArgs(['config', '--binary-url-prefix', 'https://example.com/binaries']).binaryUrlPrefix,
-    ).toBe('https://example.com/binaries')
+  it('builds options with --pinned-version value', () => {
+    const result = buildCliOptions('config', {}, { pinnedVersion: 'v1.2.3' })
+    expect(result.pinnedVersion).toBe('v1.2.3')
   })
 
-  it('parses --pinned-version with value', () => {
-    expect(parseArgs(['config', '--pinned-version', 'v1.2.3']).pinnedVersion).toBe('v1.2.3')
+  it('builds options with --output-dir value', () => {
+    const result = buildCliOptions('config', {}, { outputDir: '/tmp/test' })
+    expect(result.outputDir).toBe('/tmp/test')
   })
 
-  it('parses --output-dir with value', () => {
-    expect(parseArgs(['config', '--output-dir', '/tmp/test']).outputDir).toBe('/tmp/test')
-  })
-
-  it('parses all config flags together', () => {
-    const result = parseArgs([
+  it('builds options with all config flags together', () => {
+    const result = buildCliOptions(
       'config',
-      '--server-name',
-      'my_server',
-      '--server-url',
-      'https://example.com/mcp/default',
-      '--auto-update',
-      '--version-url',
-      'https://example.com/version',
-      '--binary-url-prefix',
-      'https://example.com/binaries',
-      '--pinned-version',
-      'v1.0.0',
-      '--output-dir',
-      '/custom/dir',
-    ])
+      {},
+      {
+        serverName: 'my_server',
+        serverUrl: 'https://example.com/mcp/default',
+        autoUpdate: true,
+        versionUrl: 'https://example.com/version',
+        binaryUrlPrefix: 'https://example.com/binaries',
+        pinnedVersion: 'v1.0.0',
+        outputDir: '/custom/dir',
+      },
+    )
 
     expect(result.subcommand).toBe('config')
     expect(result.serverName).toBe('my_server')
@@ -160,5 +153,46 @@ describe('parseArgs', () => {
     expect(result.binaryUrlPrefix).toBe('https://example.com/binaries')
     expect(result.pinnedVersion).toBe('v1.0.0')
     expect(result.outputDir).toBe('/custom/dir')
+  })
+
+  it('builds options combining global and command-specific flags', () => {
+    const result = buildCliOptions(
+      'config',
+      {
+        dryRun: true,
+        user: 'alice',
+      },
+      {
+        serverName: 'test',
+        serverUrl: 'https://test.com',
+        autoUpdate: true,
+        binaryUrlPrefix: 'https://test.com/bin',
+      },
+    )
+
+    expect(result.dryRun).toBe(true)
+    expect(result.singleUser).toBe('alice')
+    expect(result.serverName).toBe('test')
+    expect(result.autoUpdate).toBe(true)
+  })
+
+  it('handles undefined values correctly', () => {
+    const result = buildCliOptions('run', {
+      dryRun: undefined,
+      skipUpdate: undefined,
+    })
+
+    expect(result.dryRun).toBe(false)
+    expect(result.skipUpdate).toBe(false)
+  })
+
+  it('handles keepConfig default for uninstall', () => {
+    const result = buildCliOptions('uninstall', {}, {})
+    expect(result.keepConfig).toBe(false)
+  })
+
+  it('handles keepConfig true for uninstall', () => {
+    const result = buildCliOptions('uninstall', {}, { keepConfig: true })
+    expect(result.keepConfig).toBe(true)
   })
 })

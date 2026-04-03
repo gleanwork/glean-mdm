@@ -1,3 +1,4 @@
+import { Command } from 'commander'
 import { ZodError } from 'zod'
 
 import { getServerUrl, readMcpConfig, readMdmConfig } from './config.js'
@@ -15,8 +16,6 @@ export interface CliOptions {
   mcpConfigPath?: string
   mdmConfigPath?: string
   dryRun: boolean
-  showHelp: boolean
-  showVersion: boolean
   singleUser?: string
   skipUpdate: boolean
   subcommand?: 'run' | 'install-schedule' | 'uninstall-schedule' | 'uninstall' | 'config'
@@ -30,209 +29,52 @@ export interface CliOptions {
   keepConfig?: boolean
 }
 
-export function parseArgs(args: string[]): CliOptions {
-  const options: CliOptions = {
-    dryRun: false,
-    showHelp: false,
-    showVersion: false,
-    skipUpdate: false,
-  }
+export function buildCliOptions(
+  subcommand: CliOptions['subcommand'],
+  globalOpts: any,
+  cmdOpts: any = {},
+): CliOptions {
+  return {
+    subcommand,
+    dryRun: globalOpts.dryRun ?? false,
+    skipUpdate: globalOpts.skipUpdate ?? false,
+    mcpConfigPath: globalOpts.mcpConfig,
+    mdmConfigPath: globalOpts.mdmConfig,
+    singleUser: globalOpts.user,
 
-  for (let i = 0; i < args.length; i++) {
-    switch (args[i]) {
-      case '--mcp-config':
-        options.mcpConfigPath = args[++i]
-        break
-      case '--mdm-config':
-        options.mdmConfigPath = args[++i]
-        break
-      case '--dry-run':
-        options.dryRun = true
-        break
-      case '--user':
-        options.singleUser = args[++i]
-        break
-      case '--skip-update':
-        options.skipUpdate = true
-        break
-      case '--help':
-      case '-h':
-        options.showHelp = true
-        break
-      case '--version':
-        options.showVersion = true
-        break
-      case 'run':
-        options.subcommand = 'run'
-        break
-      case 'install-schedule':
-        options.subcommand = 'install-schedule'
-        break
-      case 'uninstall-schedule':
-        options.subcommand = 'uninstall-schedule'
-        break
-      case 'uninstall':
-        options.subcommand = 'uninstall'
-        break
-      case 'config':
-        options.subcommand = 'config'
-        break
-      case '--server-name':
-        options.serverName = args[++i]
-        break
-      case '--server-url':
-        options.serverUrl = args[++i]
-        break
-      case '--auto-update':
-        options.autoUpdate = true
-        break
-      case '--no-auto-update':
-        options.autoUpdate = false
-        break
-      case '--version-url':
-        options.versionUrl = args[++i]
-        break
-      case '--binary-url-prefix':
-        options.binaryUrlPrefix = args[++i]
-        break
-      case '--pinned-version':
-        options.pinnedVersion = args[++i]
-        break
-      case '--output-dir':
-        options.outputDir = args[++i]
-        break
-      case '--keep-config':
-        options.keepConfig = true
-        break
-    }
-  }
+    // config command options
+    serverName: cmdOpts.serverName,
+    serverUrl: cmdOpts.serverUrl,
+    autoUpdate: cmdOpts.autoUpdate,
+    versionUrl: cmdOpts.versionUrl,
+    binaryUrlPrefix: cmdOpts.binaryUrlPrefix,
+    pinnedVersion: cmdOpts.pinnedVersion,
+    outputDir: cmdOpts.outputDir,
 
-  return options
+    // uninstall command options
+    keepConfig: cmdOpts.keepConfig ?? false,
+  }
 }
 
-function printHelp(): void {
-  process.stdout.write(`glean-mdm ${BUILD_VERSION}
-
-Configure MCP servers across AI coding tools on managed devices.
-
-Usage:
-  glean-mdm <command> [flags]
-
-Commands:
-  run                 Run host configuration for all users
-  config              Generate mcp-config.json and mdm-config.json files
-  install-schedule    Install system scheduled task (launchd/systemd/Task Scheduler)
-  uninstall-schedule  Remove system scheduled task
-  uninstall           Full uninstall (removes schedule, config, logs, and binary)
-
-Flags:
-  -h, --help              Show this help message
-      --version           Show version
-      --dry-run           Simulate without making changes
-      --user <name>       Configure a single user instead of all users
-      --skip-update       Skip binary self-update check
-      --mcp-config <path> Custom path to MCP config file
-      --mdm-config <path> Custom path to MDM config file
-
-Uninstall flags (used with 'uninstall' command):
-      --keep-config           Preserve config files during uninstall
-
-Config flags (used with 'config' command):
-      --server-name <name>        Identifier for the MCP server (required)
-      --server-url <url>          MCP server endpoint URL (required)
-      --auto-update               Enable automatic binary updates
-      --no-auto-update            Disable automatic binary updates
-      --version-url <url>         URL to fetch latest version info
-      --binary-url-prefix <url>   Base URL for downloading binaries (required)
-      --pinned-version <version>  Pin to a specific version
-      --output-dir <path>         Directory to write config files to
-`)
-}
-
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2))
-
-  if (args.showVersion) {
-    process.stdout.write(`${BUILD_VERSION}\n`)
-    return
-  }
-
-  if (args.showHelp || !args.subcommand) {
-    printHelp()
-    return
-  }
-
-  initLogger()
-  log.info(`glean-mdm ${BUILD_VERSION}`)
-
-  if (args.subcommand === 'install-schedule') {
-    installSchedule()
-    return
-  }
-  if (args.subcommand === 'uninstall-schedule') {
-    uninstallSchedule()
-    return
-  }
-  if (args.subcommand === 'uninstall') {
-    fullUninstall({ keepConfig: args.keepConfig })
-    return
-  }
-  if (args.subcommand === 'config') {
-    if (!args.serverName) {
-      process.stderr.write('Error: --server-name is required for config subcommand\n')
-      process.exit(1)
-    }
-    if (!args.serverUrl) {
-      process.stderr.write('Error: --server-url is required for config subcommand\n')
-      process.exit(1)
-    }
-    if (args.autoUpdate === undefined) {
-      process.stderr.write('Error: --auto-update or --no-auto-update is required for config subcommand\n')
-      process.exit(1)
-    }
-    if (!args.binaryUrlPrefix) {
-      process.stderr.write('Error: --binary-url-prefix is required for config subcommand\n')
-      process.exit(1)
-    }
-    try {
-      writeConfig({
-        serverName: args.serverName,
-        serverUrl: args.serverUrl,
-        autoUpdate: args.autoUpdate,
-        versionUrl: args.versionUrl,
-        binaryUrlPrefix: args.binaryUrlPrefix,
-        pinnedVersion: args.pinnedVersion,
-        outputDir: args.outputDir,
-      })
-    } catch (err) {
-      if (err instanceof ZodError) {
-        process.stderr.write(`Validation error: ${err.issues.map((i) => i.message).join(', ')}\n`)
-        process.exit(1)
-      }
-      throw err
-    }
-    return
-  }
-
-  // subcommand === 'run'
-  const mcpConfig = readMcpConfig(args.mcpConfigPath)
-  const mdmConfig = readMdmConfig(args.mdmConfigPath)
+async function executeRun(options: CliOptions): Promise<void> {
+  const mcpConfig = readMcpConfig(options.mcpConfigPath)
+  const mdmConfig = readMdmConfig(options.mdmConfigPath)
 
   for (const server of mcpConfig.servers) {
     log.info(`Server: ${server.serverName} (${getServerUrl(server)})`)
   }
 
-  if (!args.skipUpdate && mdmConfig.autoUpdate) {
+  if (!options.skipUpdate && mdmConfig.autoUpdate) {
     await checkForUpdate(mdmConfig.versionUrl!, mdmConfig.binaryUrlPrefix, mdmConfig.pinnedVersion)
   } else if (!mdmConfig.autoUpdate) {
     log.info('Auto-update disabled by configuration')
   }
 
   let users
-  if (args.singleUser) {
-    const user = lookupUser(args.singleUser)
+  if (options.singleUser) {
+    const user = lookupUser(options.singleUser)
     if (!user) {
-      log.error(`User not found: ${args.singleUser}`)
+      log.error(`User not found: ${options.singleUser}`)
       process.exit(1)
     }
     users = [user]
@@ -250,7 +92,7 @@ async function main(): Promise<void> {
 
     const results = configureHosts({
       servers: mcpConfig.servers,
-      dryRun: args.dryRun,
+      dryRun: options.dryRun,
       gid: user.gid,
       uid: user.uid,
       userHomeDir: user.homeDir,
@@ -282,7 +124,7 @@ async function main(): Promise<void> {
     log.info(`Installing extensions for ${user.username} (${user.homeDir})`)
 
     const extResults = installExtensions({
-      dryRun: args.dryRun,
+      dryRun: options.dryRun,
       gid: user.gid,
       uid: user.uid,
       userHomeDir: user.homeDir,
@@ -301,6 +143,146 @@ async function main(): Promise<void> {
   if (totalFailure > 0 || extensionFailure > 0) {
     process.exit(1)
   }
+}
+
+async function executeInstallSchedule(options: CliOptions): Promise<void> {
+  installSchedule()
+}
+
+async function executeUninstallSchedule(options: CliOptions): Promise<void> {
+  uninstallSchedule()
+}
+
+async function executeUninstall(options: CliOptions): Promise<void> {
+  fullUninstall({ keepConfig: options.keepConfig })
+}
+
+async function executeConfig(options: CliOptions): Promise<void> {
+  try {
+    writeConfig({
+      serverName: options.serverName!,
+      serverUrl: options.serverUrl!,
+      autoUpdate: options.autoUpdate!,
+      versionUrl: options.versionUrl,
+      binaryUrlPrefix: options.binaryUrlPrefix!,
+      pinnedVersion: options.pinnedVersion,
+      outputDir: options.outputDir,
+    })
+  } catch (err) {
+    if (err instanceof ZodError) {
+      process.stderr.write(`Validation error: ${err.issues.map((i) => i.message).join(', ')}\n`)
+      process.exit(1)
+    }
+    throw err
+  }
+}
+
+function setupProgram(): Command {
+  const program = new Command()
+
+  program
+    .name('glean-mdm')
+    .version(BUILD_VERSION)
+    .description('Configure MCP servers across AI coding tools on managed devices.')
+
+  // Global options
+  program
+    .option('--dry-run', 'Simulate without making changes', false)
+    .option('--user <name>', 'Configure a single user instead of all users')
+    .option('--skip-update', 'Skip binary self-update check', false)
+    .option('--mcp-config <path>', 'Custom path to MCP config file')
+    .option('--mdm-config <path>', 'Custom path to MDM config file')
+
+  // run command
+  program
+    .command('run')
+    .description('Run host configuration for all users')
+    .action(async (cmdOptions, command) => {
+      const globalOpts = command.parent?.opts() || {}
+      const options = buildCliOptions('run', globalOpts)
+      await executeRun(options)
+    })
+
+  // install-schedule command
+  program
+    .command('install-schedule')
+    .description('Install system scheduled task (launchd/systemd/Task Scheduler)')
+    .action(async (cmdOptions, command) => {
+      const globalOpts = command.parent?.opts() || {}
+      const options = buildCliOptions('install-schedule', globalOpts)
+      await executeInstallSchedule(options)
+    })
+
+  // uninstall-schedule command
+  program
+    .command('uninstall-schedule')
+    .description('Remove system scheduled task')
+    .action(async (cmdOptions, command) => {
+      const globalOpts = command.parent?.opts() || {}
+      const options = buildCliOptions('uninstall-schedule', globalOpts)
+      await executeUninstallSchedule(options)
+    })
+
+  // uninstall command
+  program
+    .command('uninstall')
+    .description('Full uninstall (removes schedule, config, logs, and binary)')
+    .option('--keep-config', 'Preserve config files during uninstall', false)
+    .action(async (cmdOptions, command) => {
+      const globalOpts = command.parent?.opts() || {}
+      const options = buildCliOptions('uninstall', globalOpts, cmdOptions)
+      await executeUninstall(options)
+    })
+
+  // config command
+  program
+    .command('config')
+    .description('Generate mcp-config.json and mdm-config.json files')
+    .requiredOption('--server-name <name>', 'Identifier for the MCP server')
+    .requiredOption('--server-url <url>', 'MCP server endpoint URL')
+    .option('--auto-update', 'Enable automatic binary updates')
+    .option('--no-auto-update', 'Disable automatic binary updates')
+    .option('--version-url <url>', 'URL to fetch latest version info')
+    .requiredOption('--binary-url-prefix <url>', 'Base URL for downloading binaries')
+    .option('--pinned-version <version>', 'Pin to a specific version')
+    .option('--output-dir <path>', 'Directory to write config files to')
+    .action(async (cmdOptions, command) => {
+      const globalOpts = command.parent?.opts() || {}
+
+      // Additional validation for autoUpdate (must be explicitly set)
+      if (cmdOptions.autoUpdate === undefined) {
+        console.error('Error: --auto-update or --no-auto-update is required for config subcommand')
+        process.exit(1)
+      }
+
+      const options = buildCliOptions('config', globalOpts, cmdOptions)
+      await executeConfig(options)
+    })
+
+  return program
+}
+
+async function main(): Promise<void> {
+  const program = setupProgram()
+
+  // If no arguments provided, show help
+  if (process.argv.length === 2) {
+    program.outputHelp()
+    return
+  }
+
+  // Initialize logger before executing any command
+  // Skip for --help/-h/--version since Commander handles these
+  const args = process.argv.slice(2)
+  const isHelpOrVersion = args.includes('--help') || args.includes('-h') || args.includes('--version')
+
+  if (!isHelpOrVersion) {
+    initLogger()
+    log.info(`glean-mdm ${BUILD_VERSION}`)
+  }
+
+  // Parse and execute
+  await program.parseAsync(process.argv)
 }
 
 const isDirectExecution =

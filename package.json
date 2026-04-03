@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@gleanwork/mcp-config-glean": "^4.3.0",
+    "commander": "^12.1.0",
     "smol-toml": "^1.3.1",
     "yaml": "^2.8.0",
     "zod": "^3.24.0"
