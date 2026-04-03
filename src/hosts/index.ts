@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { chownSync, lstatSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
@@ -48,6 +49,41 @@ function chownAncestors(filePath: string, stopAt: string, uid: number, gid: numb
   }
 }
 
+function resolveProfileOwner(homeDir: string): string | null {
+  try {
+    const escaped = homeDir.replace(/'/g, "''")
+    const output = execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', `[Console]::OutputEncoding = [Text.Encoding]::UTF8; (Get-Acl -LiteralPath '${escaped}').Owner`],
+      { encoding: 'utf-8', stdio: 'pipe', timeout: 30_000 },
+    )
+    const owner = output.trim()
+    return owner || null
+  } catch {
+    return null
+  }
+}
+
+function setOwnerWindows(filePath: string, owner: string): void {
+  try {
+    execFileSync('icacls', [filePath, '/setowner', owner], {
+      stdio: 'pipe',
+      timeout: 30_000,
+    })
+  } catch (err) {
+    log.warn(`Failed to set owner of ${filePath} to ${owner}: ${err}`)
+  }
+}
+
+function setOwnerWindowsAncestors(filePath: string, stopAt: string, owner: string): void {
+  const stopDir = resolve(stopAt)
+  let dir = dirname(resolve(filePath))
+  while (dir.length > stopDir.length && dir.startsWith(stopDir)) {
+    setOwnerWindows(dir, owner)
+    dir = dirname(dir)
+  }
+}
+
 function deepMergeServerConfigs(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
@@ -64,11 +100,18 @@ function deepMergeServerConfigs(
 }
 
 export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[] {
-  const { servers, dryRun, gid, uid, userHomeDir } = options
+  const { servers, dryRun, gid, uid, userHomeDir, username } = options
   const currentPlatform = getPlatform()
   const registry = createGleanRegistry()
   const clients = registry.getClientsByPlatform(currentPlatform)
   const results: ConfigureResult[] = []
+
+  // Resolve the Windows profile owner once per user. The profile folder name
+  // may differ from the actual account name (e.g. domain-joined or Microsoft
+  // accounts), so we read the owner from the home directory which Windows
+  // creates with the correct principal.
+  const windowsOwner =
+    currentPlatform === 'win32' ? resolveProfileOwner(userHomeDir) ?? username : undefined
 
   for (const client of clients) {
     const configPath = client.configPath[currentPlatform]
@@ -115,7 +158,12 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
           throw new Error(`Unsupported config format: ${client.configFormat}`)
       }
 
-      if (currentPlatform !== 'win32' && uid !== undefined && gid !== undefined) {
+      if (currentPlatform === 'win32' && windowsOwner) {
+        if (!lstatSync(resolvedPath).isSymbolicLink()) {
+          setOwnerWindows(resolvedPath, windowsOwner)
+        }
+        setOwnerWindowsAncestors(resolvedPath, userHomeDir, windowsOwner)
+      } else if (uid !== undefined && gid !== undefined) {
         if (!lstatSync(resolvedPath).isSymbolicLink()) {
           chownSync(resolvedPath, uid, gid)
         }
