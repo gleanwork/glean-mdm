@@ -255,6 +255,111 @@ describe('configureJsonFile', () => {
     })
   })
 
+  it('deduplicates servers using serverUrl property (Windsurf/Antigravity)', () => {
+    const filePath = join(tempDir, 'mcp.json')
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        mcpServers: {
+          glean_A: {
+            serverUrl: 'https://example-be.glean.com/mcp/default',
+            headers: { 'X-Test': 'value' },
+          },
+        },
+      }),
+    )
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          glean_B: {
+            serverUrl: 'https://example-be.glean.com/mcp/default',
+            headers: { 'X-Test': 'value' },
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+    // Should only have glean_A, glean_B should be skipped as duplicate
+    expect(result.mcpServers).toEqual({
+      glean_A: {
+        serverUrl: 'https://example-be.glean.com/mcp/default',
+        headers: { 'X-Test': 'value' },
+      },
+    })
+  })
+
+  it('deduplicates servers using httpUrl property (Gemini CLI)', () => {
+    const filePath = join(tempDir, 'mcp.json')
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        mcpServers: {
+          server_first: {
+            httpUrl: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          server_second: {
+            httpUrl: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+    // Should only have server_first, server_second should be skipped as duplicate
+    expect(result.mcpServers).toEqual({
+      server_first: {
+        httpUrl: 'https://example-be.glean.com/mcp/default',
+      },
+    })
+  })
+
+  it('deduplicates across different URL property names', () => {
+    const filePath = join(tempDir, 'mcp.json')
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        mcpServers: {
+          server_url: {
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          server_serverUrl: {
+            serverUrl: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+    // Should only have server_url, server_serverUrl should be skipped (same URL, different property name)
+    expect(result.mcpServers).toEqual({
+      server_url: {
+        url: 'https://example-be.glean.com/mcp/default',
+      },
+    })
+  })
+
   it('preserves symlinks and updates the target file', () => {
     const targetDir = mkdtempSync(join(tmpdir(), 'mdm-json-target-'))
     const targetPath = join(targetDir, 'mcp.json')

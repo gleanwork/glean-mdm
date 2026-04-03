@@ -155,4 +155,72 @@ describe('configureTomlFile', () => {
 
     expect(firstRun).toBe(secondRun)
   })
+
+  it('deduplicates servers using url property', () => {
+    const filePath = join(tempDir, 'config.toml')
+    writeFileSync(
+      filePath,
+      TOML.stringify({
+        mcp_servers: {
+          server_first: {
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureTomlFile({
+      configToMerge: {
+        mcp_servers: {
+          server_second: {
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = TOML.parse(readFileSync(filePath, 'utf-8')) as Record<string, Record<string, Record<string, string>>>
+
+    // Should only have server_first, server_second should be skipped as duplicate
+    expect(result.mcp_servers).toEqual({
+      server_first: {
+        url: 'https://example-be.glean.com/mcp/default',
+      },
+    })
+  })
+
+  it('deduplicates servers using serverUrl property', () => {
+    const filePath = join(tempDir, 'config.toml')
+    writeFileSync(
+      filePath,
+      TOML.stringify({
+        mcp_servers: {
+          glean_A: {
+            serverUrl: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureTomlFile({
+      configToMerge: {
+        mcp_servers: {
+          glean_B: {
+            serverUrl: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = TOML.parse(readFileSync(filePath, 'utf-8')) as Record<string, Record<string, Record<string, string>>>
+
+    // Should only have glean_A, glean_B should be skipped as duplicate
+    expect(result.mcp_servers).toEqual({
+      glean_A: {
+        serverUrl: 'https://example-be.glean.com/mcp/default',
+      },
+    })
+  })
 })
