@@ -11,18 +11,6 @@ export interface UninstallOptions {
 export function fullUninstall(options: UninstallOptions = {}): void {
   uninstallSchedule()
 
-  const configDir = getDefaultConfigDir()
-  if (options.keepConfig) {
-    log.info(`Keeping config directory: ${configDir}`)
-  } else {
-    try {
-      rmSync(configDir, { recursive: true, force: true })
-      log.info(`Removed config directory: ${configDir}`)
-    } catch {
-      log.warn(`Could not remove config directory: ${configDir}`)
-    }
-  }
-
   const binaryPath = getBinaryInstallPath()
   if (getPlatform() === 'win32') {
     // Windows locks running executables. Rename first (works on locked
@@ -51,10 +39,22 @@ export function fullUninstall(options: UninstallOptions = {}): void {
 
   log.info('Uninstall complete')
 
-  // Delete log file last so earlier steps can still write to it
+  // Remove config dir and log file last so earlier steps can still write
+  // to the log. On Windows the log file lives inside the config dir, so
+  // removing the config dir implicitly removes the log file too.
+  const configDir = getDefaultConfigDir()
+  if (options.keepConfig) {
+    log.info(`Keeping config directory: ${configDir}`)
+  } else {
+    try {
+      rmSync(configDir, { recursive: true, force: true })
+    } catch {
+      // May not exist
+    }
+  }
   try {
     unlinkSync(getLogFilePath())
   } catch {
-    // May not exist
+    // May not exist, or already removed with config dir on Windows
   }
 }
