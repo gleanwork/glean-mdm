@@ -6,6 +6,7 @@ import { writeConfig } from './config-writer.js'
 import { installExtensions } from './extensions/index.js'
 import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
+import { requireAdminPrivileges } from './privileges.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
 import { fullUninstall } from './uninstaller.js'
 import { checkForUpdate } from './updater.js'
@@ -57,6 +58,8 @@ export function buildCliOptions(
 }
 
 async function executeRun(options: CliOptions): Promise<void> {
+  requireAdminPrivileges('run')
+
   const mcpConfig = readMcpConfig(options.mcpConfigPath)
   const mdmConfig = readMdmConfig(options.mdmConfigPath)
 
@@ -146,18 +149,22 @@ async function executeRun(options: CliOptions): Promise<void> {
 }
 
 async function executeInstallSchedule(options: CliOptions): Promise<void> {
+  requireAdminPrivileges('install-schedule')
   installSchedule()
 }
 
 async function executeUninstallSchedule(options: CliOptions): Promise<void> {
+  requireAdminPrivileges('uninstall-schedule')
   uninstallSchedule()
 }
 
 async function executeUninstall(options: CliOptions): Promise<void> {
+  requireAdminPrivileges('uninstall')
   fullUninstall({ keepConfig: options.keepConfig })
 }
 
 async function executeConfig(options: CliOptions): Promise<void> {
+  requireAdminPrivileges('config')
   try {
     writeConfig({
       serverName: options.serverName!,
