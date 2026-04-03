@@ -164,7 +164,6 @@ async function executeUninstall(options: CliOptions): Promise<void> {
 }
 
 async function executeConfig(options: CliOptions): Promise<void> {
-  requireAdminPrivileges('config')
   try {
     writeConfig({
       serverName: options.serverName!,
