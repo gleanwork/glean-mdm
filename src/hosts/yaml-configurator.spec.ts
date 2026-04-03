@@ -180,4 +180,72 @@ describe('configureYamlFile', () => {
 
     expect(result.extensions.glean_default.uri).toBe('https://example-be.glean.com/mcp/default')
   })
+
+  it('deduplicates servers using uri property', () => {
+    const filePath = join(tempDir, 'config.yaml')
+    writeFileSync(
+      filePath,
+      YAML.stringify({
+        extensions: {
+          server_first: {
+            uri: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureYamlFile({
+      configToMerge: {
+        extensions: {
+          server_second: {
+            uri: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = YAML.parse(readFileSync(filePath, 'utf-8'))
+
+    // Should only have server_first, server_second should be skipped as duplicate
+    expect(result.extensions).toEqual({
+      server_first: {
+        uri: 'https://example-be.glean.com/mcp/default',
+      },
+    })
+  })
+
+  it('deduplicates servers using serverUrl property', () => {
+    const filePath = join(tempDir, 'config.yaml')
+    writeFileSync(
+      filePath,
+      YAML.stringify({
+        mcpServers: {
+          glean_A: {
+            serverUrl: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureYamlFile({
+      configToMerge: {
+        mcpServers: {
+          glean_B: {
+            serverUrl: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = YAML.parse(readFileSync(filePath, 'utf-8'))
+
+    // Should only have glean_A, glean_B should be skipped as duplicate
+    expect(result.mcpServers).toEqual({
+      glean_A: {
+        serverUrl: 'https://example-be.glean.com/mcp/default',
+      },
+    })
+  })
 })
