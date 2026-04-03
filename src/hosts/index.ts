@@ -54,7 +54,7 @@ function resolveProfileOwner(homeDir: string): string | null {
     const escaped = homeDir.replace(/'/g, "''")
     const output = execFileSync(
       'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', `(Get-Acl -LiteralPath '${escaped}').Owner`],
+      ['-NoProfile', '-NonInteractive', '-Command', `[Console]::OutputEncoding = [Text.Encoding]::UTF8; (Get-Acl -LiteralPath '${escaped}').Owner`],
       { encoding: 'utf-8', stdio: 'pipe', timeout: 30_000 },
     )
     const owner = output.trim()

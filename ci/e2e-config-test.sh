@@ -210,8 +210,9 @@ case "$(uname -s)" in
 
     # Deduplicate paths (some hosts share the same config file)
     while IFS= read -r f; do
+      WIN_F=$(cygpath -w "$f")
       ACTUAL_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
-        "(Get-Acl -LiteralPath '${f}').Owner" | tr -d '\r')
+        "(Get-Acl -LiteralPath '${WIN_F}').Owner" | tr -d '\r')
       CHECKED=$((CHECKED + 1))
       if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
         echo "  OK: $f"
