@@ -196,6 +196,42 @@ else
 fi
 
 echo ""
+echo "=== Verify config file ownership ==="
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    WIN_HOME=$(cygpath -w "$HOME")
+    EXPECTED_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
+      "(Get-Acl -LiteralPath '${WIN_HOME}').Owner" | tr -d '\r')
+    echo "Expected owner: $EXPECTED_OWNER"
+
+    OWNERSHIP_OK=true
+    CHECKED=0
+    # Deduplicate paths (some hosts share the same config file)
+    while IFS= read -r f; do
+      ACTUAL_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
+        "(Get-Acl -LiteralPath '${f}').Owner" | tr -d '\r')
+      CHECKED=$((CHECKED + 1))
+      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
+        echo "  OK: $f"
+      else
+        echo "  FAIL: $f (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
+        OWNERSHIP_OK=false
+      fi
+    done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
+
+    if [ "$OWNERSHIP_OK" = true ]; then
+      echo "PASS [ownership]: All $CHECKED config file(s) owned by $EXPECTED_OWNER"
+    else
+      echo "FAIL [ownership]: Some config files have incorrect ownership"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "SKIP [ownership]: Ownership verification is Windows-only"
+    ;;
+esac
+
+echo ""
 echo "=== Compute Run 1 checksums ==="
 # Deduplicate paths (e.g. cursor and cursor-agent share the same file)
 UNIQUE_FILES_FILE="$(mktemp)"
