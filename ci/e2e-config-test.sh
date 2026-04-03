@@ -196,6 +196,68 @@ else
 fi
 
 echo ""
+echo "=== Verify config file ownership ==="
+EXPECTED_OWNER="$(whoami)"
+OWNERSHIP_OK=true
+CHECKED=0
+
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    WIN_HOME=$(cygpath -w "$HOME")
+    EXPECTED_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
+      "(Get-Acl -LiteralPath '${WIN_HOME}').Owner" | tr -d '\r')
+    echo "Expected owner: $EXPECTED_OWNER"
+
+    # Deduplicate paths (some hosts share the same config file)
+    while IFS= read -r f; do
+      WIN_F=$(cygpath -w "$f")
+      ACTUAL_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
+        "(Get-Acl -LiteralPath '${WIN_F}').Owner" | tr -d '\r')
+      CHECKED=$((CHECKED + 1))
+      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
+        echo "  OK: $f"
+      else
+        echo "  FAIL: $f (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
+        OWNERSHIP_OK=false
+      fi
+    done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
+    ;;
+  Darwin)
+    echo "Expected owner: $EXPECTED_OWNER"
+    while IFS= read -r f; do
+      ACTUAL_OWNER=$(stat -f '%Su' "$f")
+      CHECKED=$((CHECKED + 1))
+      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
+        echo "  OK: $f"
+      else
+        echo "  FAIL: $f (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
+        OWNERSHIP_OK=false
+      fi
+    done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
+    ;;
+  Linux)
+    echo "Expected owner: $EXPECTED_OWNER"
+    while IFS= read -r f; do
+      ACTUAL_OWNER=$(stat -c '%U' "$f")
+      CHECKED=$((CHECKED + 1))
+      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
+        echo "  OK: $f"
+      else
+        echo "  FAIL: $f (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
+        OWNERSHIP_OK=false
+      fi
+    done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
+    ;;
+esac
+
+if [ "$OWNERSHIP_OK" = true ]; then
+  echo "PASS [ownership]: All $CHECKED config file(s) owned by $EXPECTED_OWNER"
+else
+  echo "FAIL [ownership]: Some config files have incorrect ownership"
+  exit 1
+fi
+
+echo ""
 echo "=== Compute Run 1 checksums ==="
 # Deduplicate paths (e.g. cursor and cursor-agent share the same file)
 UNIQUE_FILES_FILE="$(mktemp)"
