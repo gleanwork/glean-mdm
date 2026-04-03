@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 import { parseArgs } from './index'
 
@@ -85,11 +85,58 @@ describe('parseArgs', () => {
     expect(result.singleUser).toBe('bob')
   })
 
-  it('ignores unknown flags', () => {
-    const result = parseArgs(['--unknown', '--dry-run'])
+  it('rejects unknown flags with error', () => {
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called')
+    })
+    const mockStderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
+    expect(() => parseArgs(['--unknown-flag'])).toThrow('process.exit called')
+    expect(mockStderr).toHaveBeenCalledWith(expect.stringContaining('Error: Unknown flag: --unknown-flag'))
+    expect(mockExit).toHaveBeenCalledWith(1)
+
+    mockExit.mockRestore()
+    mockStderr.mockRestore()
+  })
+
+  it('rejects flag with missing value at end of input', () => {
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called')
+    })
+    const mockStderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    expect(() => parseArgs(['--user'])).toThrow('process.exit called')
+    expect(mockStderr).toHaveBeenCalledWith('Error: Flag --user requires a value\n')
+    expect(mockExit).toHaveBeenCalledWith(1)
+
+    mockExit.mockRestore()
+    mockStderr.mockRestore()
+  })
+
+  it('rejects flag with another flag as its value', () => {
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called')
+    })
+    const mockStderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    expect(() => parseArgs(['--user', '--dry-run'])).toThrow('process.exit called')
+    expect(mockStderr).toHaveBeenCalledWith('Error: Flag --user requires a value, got flag --dry-run instead\n')
+    expect(mockExit).toHaveBeenCalledWith(1)
+
+    mockExit.mockRestore()
+    mockStderr.mockRestore()
+  })
+
+  it('does not treat flag values as unknown flags', () => {
+    const result = parseArgs(['--user', 'alice', '--dry-run'])
+    expect(result.singleUser).toBe('alice')
     expect(result.dryRun).toBe(true)
-    expect(result.showVersion).toBe(false)
+  })
+
+  it('does not treat subcommands as unknown flags', () => {
+    const result = parseArgs(['run', '--dry-run'])
+    expect(result.subcommand).toBe('run')
+    expect(result.dryRun).toBe(true)
   })
 
   it('parses config subcommand', () => {

@@ -38,8 +38,63 @@ export function parseArgs(args: string[]): CliOptions {
     skipUpdate: false,
   }
 
+  const knownFlags = new Set([
+    '--help',
+    '-h',
+    '--version',
+    '--dry-run',
+    '--user',
+    '--skip-update',
+    '--mcp-config',
+    '--mdm-config',
+    '--server-name',
+    '--server-url',
+    '--auto-update',
+    '--no-auto-update',
+    '--version-url',
+    '--binary-url-prefix',
+    '--pinned-version',
+    '--output-dir',
+    '--keep-config',
+  ])
+
+  const flagsWithValues = new Set([
+    '--user',
+    '--mcp-config',
+    '--mdm-config',
+    '--server-name',
+    '--server-url',
+    '--version-url',
+    '--binary-url-prefix',
+    '--pinned-version',
+    '--output-dir',
+  ])
+
   for (let i = 0; i < args.length; i++) {
-    switch (args[i]) {
+    const arg = args[i]
+
+    // Validate flags that start with - or --
+    if (arg.startsWith('-')) {
+      if (!knownFlags.has(arg)) {
+        process.stderr.write(`Error: Unknown flag: ${arg}\nRun 'glean-mdm --help' for usage information.\n`)
+        process.exit(1)
+      }
+
+      // Validate flags that require values have a value
+      if (flagsWithValues.has(arg)) {
+        const nextArg = args[i + 1]
+        if (nextArg === undefined) {
+          process.stderr.write(`Error: Flag ${arg} requires a value\n`)
+          process.exit(1)
+        }
+        if (nextArg.startsWith('-')) {
+          process.stderr.write(`Error: Flag ${arg} requires a value, got flag ${nextArg} instead\n`)
+          process.exit(1)
+        }
+      }
+    }
+
+    switch (arg) {
       case '--mcp-config':
         options.mcpConfigPath = args[++i]
         break
