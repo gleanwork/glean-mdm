@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { chownSync, lstatSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
@@ -48,6 +49,26 @@ function chownAncestors(filePath: string, stopAt: string, uid: number, gid: numb
   }
 }
 
+function setOwnerWindows(filePath: string, username: string): void {
+  try {
+    execFileSync('icacls', [filePath, '/setowner', username], {
+      stdio: 'pipe',
+      timeout: 30_000,
+    })
+  } catch (err) {
+    log.warn(`Failed to set owner of ${filePath} to ${username}: ${err}`)
+  }
+}
+
+function setOwnerWindowsAncestors(filePath: string, stopAt: string, username: string): void {
+  const stopDir = resolve(stopAt)
+  let dir = dirname(resolve(filePath))
+  while (dir.length > stopDir.length && dir.startsWith(stopDir)) {
+    setOwnerWindows(dir, username)
+    dir = dirname(dir)
+  }
+}
+
 function deepMergeServerConfigs(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
@@ -64,7 +85,7 @@ function deepMergeServerConfigs(
 }
 
 export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[] {
-  const { servers, dryRun, gid, uid, userHomeDir } = options
+  const { servers, dryRun, gid, uid, userHomeDir, username } = options
   const currentPlatform = getPlatform()
   const registry = createGleanRegistry()
   const clients = registry.getClientsByPlatform(currentPlatform)
@@ -115,7 +136,12 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
           throw new Error(`Unsupported config format: ${client.configFormat}`)
       }
 
-      if (currentPlatform !== 'win32' && uid !== undefined && gid !== undefined) {
+      if (currentPlatform === 'win32') {
+        if (!lstatSync(resolvedPath).isSymbolicLink()) {
+          setOwnerWindows(resolvedPath, username)
+        }
+        setOwnerWindowsAncestors(resolvedPath, userHomeDir, username)
+      } else if (uid !== undefined && gid !== undefined) {
         if (!lstatSync(resolvedPath).isSymbolicLink()) {
           chownSync(resolvedPath, uid, gid)
         }
