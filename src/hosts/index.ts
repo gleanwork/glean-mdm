@@ -49,22 +49,37 @@ function chownAncestors(filePath: string, stopAt: string, uid: number, gid: numb
   }
 }
 
-function setOwnerWindows(filePath: string, username: string): void {
+function resolveProfileOwner(homeDir: string): string | null {
   try {
-    execFileSync('icacls', [filePath, '/setowner', username], {
+    const escaped = homeDir.replace(/'/g, "''")
+    const output = execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', `(Get-Acl -LiteralPath '${escaped}').Owner`],
+      { encoding: 'utf-8', stdio: 'pipe', timeout: 30_000 },
+    )
+    const owner = output.trim()
+    return owner || null
+  } catch {
+    return null
+  }
+}
+
+function setOwnerWindows(filePath: string, owner: string): void {
+  try {
+    execFileSync('icacls', [filePath, '/setowner', owner], {
       stdio: 'pipe',
       timeout: 30_000,
     })
   } catch (err) {
-    log.warn(`Failed to set owner of ${filePath} to ${username}: ${err}`)
+    log.warn(`Failed to set owner of ${filePath} to ${owner}: ${err}`)
   }
 }
 
-function setOwnerWindowsAncestors(filePath: string, stopAt: string, username: string): void {
+function setOwnerWindowsAncestors(filePath: string, stopAt: string, owner: string): void {
   const stopDir = resolve(stopAt)
   let dir = dirname(resolve(filePath))
   while (dir.length > stopDir.length && dir.startsWith(stopDir)) {
-    setOwnerWindows(dir, username)
+    setOwnerWindows(dir, owner)
     dir = dirname(dir)
   }
 }
@@ -90,6 +105,13 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
   const registry = createGleanRegistry()
   const clients = registry.getClientsByPlatform(currentPlatform)
   const results: ConfigureResult[] = []
+
+  // Resolve the Windows profile owner once per user. The profile folder name
+  // may differ from the actual account name (e.g. domain-joined or Microsoft
+  // accounts), so we read the owner from the home directory which Windows
+  // creates with the correct principal.
+  const windowsOwner =
+    currentPlatform === 'win32' ? resolveProfileOwner(userHomeDir) ?? username : undefined
 
   for (const client of clients) {
     const configPath = client.configPath[currentPlatform]
@@ -136,11 +158,11 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
           throw new Error(`Unsupported config format: ${client.configFormat}`)
       }
 
-      if (currentPlatform === 'win32') {
+      if (currentPlatform === 'win32' && windowsOwner) {
         if (!lstatSync(resolvedPath).isSymbolicLink()) {
-          setOwnerWindows(resolvedPath, username)
+          setOwnerWindows(resolvedPath, windowsOwner)
         }
-        setOwnerWindowsAncestors(resolvedPath, userHomeDir, username)
+        setOwnerWindowsAncestors(resolvedPath, userHomeDir, windowsOwner)
       } else if (uid !== undefined && gid !== undefined) {
         if (!lstatSync(resolvedPath).isSymbolicLink()) {
           chownSync(resolvedPath, uid, gid)
