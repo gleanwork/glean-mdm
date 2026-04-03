@@ -189,7 +189,7 @@ case "$SCHEDULE_TYPE" in
 
     # Verify task action is correctly parsed (Execute and Arguments)
     TASK_ACTION=$(powershell -Command "\$task = Get-ScheduledTask -TaskName '$TASK_NAME'; \$task.Actions[0] | Select-Object -Property Execute, Arguments | ConvertTo-Json -Compress")
-    EXPECTED_EXECUTE="C:\\Program Files\\Glean\\glean-mdm.exe"
+    EXPECTED_EXECUTE="\"C:\\Program Files\\Glean\\glean-mdm.exe\""
     EXPECTED_ARGUMENTS="run"
 
     ACTUAL_EXECUTE=$(echo "$TASK_ACTION" | jq -r '.Execute')
