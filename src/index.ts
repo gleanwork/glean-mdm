@@ -57,9 +57,6 @@ export function buildCliOptions(
 }
 
 async function executeRun(options: CliOptions): Promise<void> {
-  initLogger()
-  log.info(`glean-mdm ${BUILD_VERSION}`)
-
   const mcpConfig = readMcpConfig(options.mcpConfigPath)
   const mdmConfig = readMdmConfig(options.mdmConfigPath)
 
@@ -149,27 +146,18 @@ async function executeRun(options: CliOptions): Promise<void> {
 }
 
 async function executeInstallSchedule(options: CliOptions): Promise<void> {
-  initLogger()
-  log.info(`glean-mdm ${BUILD_VERSION}`)
   installSchedule()
 }
 
 async function executeUninstallSchedule(options: CliOptions): Promise<void> {
-  initLogger()
-  log.info(`glean-mdm ${BUILD_VERSION}`)
   uninstallSchedule()
 }
 
 async function executeUninstall(options: CliOptions): Promise<void> {
-  initLogger()
-  log.info(`glean-mdm ${BUILD_VERSION}`)
   fullUninstall({ keepConfig: options.keepConfig })
 }
 
 async function executeConfig(options: CliOptions): Promise<void> {
-  initLogger()
-  log.info(`glean-mdm ${BUILD_VERSION}`)
-
   try {
     writeConfig({
       serverName: options.serverName!,
@@ -281,6 +269,16 @@ async function main(): Promise<void> {
   if (process.argv.length === 2) {
     program.outputHelp()
     return
+  }
+
+  // Initialize logger before executing any command
+  // Skip for --help/-h/--version since Commander handles these
+  const args = process.argv.slice(2)
+  const isHelpOrVersion = args.includes('--help') || args.includes('-h') || args.includes('--version')
+
+  if (!isHelpOrVersion) {
+    initLogger()
+    log.info(`glean-mdm ${BUILD_VERSION}`)
   }
 
   // Parse and execute
