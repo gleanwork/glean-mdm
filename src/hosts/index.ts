@@ -115,7 +115,7 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
 
   for (const client of clients) {
     const configPath = client.configPath[currentPlatform]
-    if (!configPath || !client.userConfigurable) continue
+    if (!configPath || !client.userConfigurable || !client.transports.includes('http')) continue
 
     const resolvedPath = expandConfigPath(configPath, userHomeDir)
 
