@@ -161,7 +161,7 @@ jobs:
           bun build src/index.ts `
             --compile `
             --target=bun-windows-x64 `
-            --define "process.env.BUILD_VERSION=\"0.1.0\"" `
+            --define 'process.env.BUILD_VERSION="0.1.0"' `
             --outfile dist/glean-mdm.exe
       - name: Run Windows-native ownership integration test
         run: bunx vitest run ci/windows-config-ownership.spec.ts
