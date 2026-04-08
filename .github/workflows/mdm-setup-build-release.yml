@@ -33,4 +33,3 @@ jobs:
           files: |
             dist/glean-mdm-*
             dist/version.json
-            dist/install-glean-mdm-*
