@@ -14,6 +14,13 @@ function expandConfigPath(configPath: string, userHomeDir: string): string {
 }
 
 function runBinary(binaryPath: string, args: string[]): string {
+  const psexecPath = process.env.PSEXEC_PATH
+  if (psexecPath) {
+    return execFileSync(psexecPath, ['-s', '-accepteula', '-nobanner', binaryPath, ...args], {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    })
+  }
   return execFileSync(binaryPath, args, {
     encoding: 'utf-8',
     stdio: 'pipe',

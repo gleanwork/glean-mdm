@@ -163,7 +163,13 @@ jobs:
             --target=bun-windows-x64 `
             --define 'process.env.BUILD_VERSION="0.1.0"' `
             --outfile dist/glean-mdm.exe
+      - name: Download PsExec
+        run: |
+          Invoke-WebRequest -Uri "https://download.sysinternals.com/files/PSTools.zip" -OutFile "$env:TEMP\PSTools.zip"
+          Expand-Archive -Path "$env:TEMP\PSTools.zip" -DestinationPath "$env:TEMP\PSTools"
       - name: Run Windows-native ownership integration test
+        env:
+          PSEXEC_PATH: ${{ runner.temp }}\PSTools\PsExec64.exe
         run: bunx vitest run --config ci/vitest.windows.config.ts
 
   e2e-schedule:
