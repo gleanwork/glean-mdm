@@ -283,6 +283,28 @@ describe('writeConfig', () => {
     })
   })
 
+  it('skips mcp-config.json entry when same URL already exists under a different name', () => {
+    writeConfig({
+      serverName: 'glean_old',
+      serverUrl: 'https://example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    writeConfig({
+      serverName: 'glean_new',
+      serverUrl: 'https://example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    const mcp = JSON.parse(readFileSync(join(outputDir, 'mcp-config.json'), 'utf-8'))
+    expect(mcp).toHaveLength(1)
+    expect(mcp[0].serverName).toBe('glean_old')
+  })
+
   it('appends multiple distinct servers across successive calls', () => {
     const base = {
       autoUpdate: false,

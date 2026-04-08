@@ -360,6 +360,34 @@ describe('configureJsonFile', () => {
     })
   })
 
+  it('deduplicates within incoming entries that share the same URL', () => {
+    const filePath = join(tempDir, 'mcp.json')
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          glean_old: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+          glean_new: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+    expect(Object.keys(result.mcpServers)).toHaveLength(1)
+    expect(result.mcpServers.glean_old).toEqual({
+      type: 'http',
+      url: 'https://example-be.glean.com/mcp/default',
+    })
+  })
+
   it('preserves symlinks and updates the target file', () => {
     const targetDir = mkdtempSync(join(tmpdir(), 'mdm-json-target-'))
     const targetPath = join(targetDir, 'mcp.json')

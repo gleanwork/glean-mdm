@@ -54,10 +54,13 @@ export function writeConfig(options: WriteConfigOptions): void {
 
   const mcpPath = join(outputDir, 'mcp-config.json')
   const existingEntries = readExistingMcpEntries(mcpPath)
-  const alreadyExists = existingEntries.some((e) => e.serverName === newEntry.serverName)
+  const nameMatch = existingEntries.find((e) => e.serverName === newEntry.serverName)
+  const urlMatch = existingEntries.find((e) => e.url === newEntry.url)
 
-  if (alreadyExists) {
+  if (nameMatch) {
     log.info(`Skipped ${mcpPath} (entry "${newEntry.serverName}" already exists)`)
+  } else if (urlMatch) {
+    log.info(`Skipped ${mcpPath} (URL "${newEntry.url}" already configured under "${urlMatch.serverName}")`)
   } else {
     const merged = [...existingEntries, newEntry]
     const mcpWritePath = resolveWritePath(mcpPath)
