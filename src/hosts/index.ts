@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chownSync, lstatSync, mkdirSync } from 'node:fs'
+import { chownSync, existsSync, lstatSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
 import { createGleanRegistry } from '@gleanwork/mcp-config-glean'
@@ -49,12 +49,35 @@ function chownAncestors(filePath: string, stopAt: string, uid: number, gid: numb
   }
 }
 
-function resolveProfileOwner(homeDir: string): string | null {
+function collectMissingAncestorDirs(filePath: string, stopAt: string): string[] {
+  const stopDir = resolve(stopAt)
+  const missingDirs: string[] = []
+  let dir = dirname(resolve(filePath))
+
+  while (dir.length > stopDir.length && dir.startsWith(stopDir)) {
+    if (existsSync(dir)) break
+    missingDirs.push(dir)
+    dir = dirname(dir)
+  }
+
+  return missingDirs.reverse()
+}
+
+function escapePowerShellSingleQuoted(value: string): string {
+  return value.replace(/'/g, "''")
+}
+
+function resolveWindowsOwner(homeDir: string): string | null {
   try {
-    const escaped = homeDir.replace(/'/g, "''")
+    const escaped = escapePowerShellSingleQuoted(homeDir)
     const output = execFileSync(
       'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', `[Console]::OutputEncoding = [Text.Encoding]::UTF8; (Get-Acl -LiteralPath '${escaped}').Owner`],
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `[Console]::OutputEncoding = [Text.Encoding]::UTF8; $profile = Get-CimInstance Win32_UserProfile | Where-Object { $_.LocalPath -eq '${escaped}' } | Select-Object -First 1; if ($null -eq $profile -or [string]::IsNullOrWhiteSpace($profile.SID)) { throw 'No Windows profile SID found' }; ([System.Security.Principal.SecurityIdentifier]::new($profile.SID)).Translate([System.Security.Principal.NTAccount]).Value`,
+      ],
       { encoding: 'utf-8', stdio: 'pipe', timeout: 30_000 },
     )
     const owner = output.trim()
@@ -64,23 +87,30 @@ function resolveProfileOwner(homeDir: string): string | null {
   }
 }
 
+function formatExecFileError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err)
+
+  const details = [err.message]
+  const withOutput = err as Error & { stderr?: string | Buffer; stdout?: string | Buffer }
+
+  const stderr = typeof withOutput.stderr === 'string' ? withOutput.stderr.trim() : withOutput.stderr?.toString().trim()
+  const stdout = typeof withOutput.stdout === 'string' ? withOutput.stdout.trim() : withOutput.stdout?.toString().trim()
+
+  if (stderr) details.push(`stderr: ${stderr}`)
+  if (stdout) details.push(`stdout: ${stdout}`)
+
+  return details.join(' | ')
+}
+
 function setOwnerWindows(filePath: string, owner: string): void {
   try {
     execFileSync('icacls', [filePath, '/setowner', owner], {
+      encoding: 'utf-8',
       stdio: 'pipe',
       timeout: 30_000,
     })
   } catch (err) {
-    log.warn(`Failed to set owner of ${filePath} to ${owner}: ${err}`)
-  }
-}
-
-function setOwnerWindowsAncestors(filePath: string, stopAt: string, owner: string): void {
-  const stopDir = resolve(stopAt)
-  let dir = dirname(resolve(filePath))
-  while (dir.length > stopDir.length && dir.startsWith(stopDir)) {
-    setOwnerWindows(dir, owner)
-    dir = dirname(dir)
+    throw new Error(`Failed to set owner of ${filePath} to ${owner}: ${formatExecFileError(err)}`)
   }
 }
 
@@ -103,20 +133,22 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
   const { servers, dryRun, gid, uid, userHomeDir, username } = options
   const currentPlatform = getPlatform()
   const registry = createGleanRegistry()
-  const clients = registry.getClientsByPlatform(currentPlatform)
+  const clients = registry
+    .getClientsByPlatform(currentPlatform)
+    .filter((client) => client.configPath[currentPlatform] && client.userConfigurable && client.transports.includes('http'))
   const results: ConfigureResult[] = []
 
-  // Resolve the Windows profile owner once per user. The profile folder name
-  // may differ from the actual account name (e.g. domain-joined or Microsoft
-  // accounts), so we read the owner from the home directory which Windows
-  // creates with the correct principal.
   const windowsOwner =
-    currentPlatform === 'win32' ? resolveProfileOwner(userHomeDir) ?? username : undefined
+    currentPlatform === 'win32' && !dryRun ? resolveWindowsOwner(userHomeDir) : undefined
+
+  if (currentPlatform === 'win32' && !dryRun && !windowsOwner) {
+    const error = `Failed to resolve Windows account owner for ${username} (${userHomeDir})`
+    log.error(error)
+    return clients.map((client) => ({ error, host: client.displayName, success: false }))
+  }
 
   for (const client of clients) {
-    const configPath = client.configPath[currentPlatform]
-    if (!configPath || !client.userConfigurable || !client.transports.includes('http')) continue
-
+    const configPath = client.configPath[currentPlatform]!
     const resolvedPath = expandConfigPath(configPath, userHomeDir)
 
     if (dryRun) {
@@ -127,6 +159,8 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
 
     try {
       const builder = registry.createBuilder(client.id)
+      const createdDirs = collectMissingAncestorDirs(resolvedPath, userHomeDir)
+      const fileExisted = existsSync(resolvedPath)
 
       let mergedConfig: Record<string, unknown> = {}
       for (const server of servers) {
@@ -159,10 +193,12 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
       }
 
       if (currentPlatform === 'win32' && windowsOwner) {
-        if (!lstatSync(resolvedPath).isSymbolicLink()) {
+        if (!fileExisted && !lstatSync(resolvedPath).isSymbolicLink()) {
           setOwnerWindows(resolvedPath, windowsOwner)
         }
-        setOwnerWindowsAncestors(resolvedPath, userHomeDir, windowsOwner)
+        for (const dir of createdDirs) {
+          setOwnerWindows(dir, windowsOwner)
+        }
       } else if (uid !== undefined && gid !== undefined) {
         if (!lstatSync(resolvedPath).isSymbolicLink()) {
           chownSync(resolvedPath, uid, gid)
