@@ -24,7 +24,12 @@ function getOwner(filePath: string): string {
   const escaped = filePath.replace(/'/g, "''")
   return execFileSync(
     'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-Command', `(Get-Acl -LiteralPath '${escaped}').Owner`],
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `Import-Module Microsoft.PowerShell.Security; (Get-Acl -LiteralPath '${escaped}').Owner`,
+    ],
     { encoding: 'utf-8', stdio: 'pipe' },
   ).trim()
 }
