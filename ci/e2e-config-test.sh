@@ -258,6 +258,74 @@ else
 fi
 
 echo ""
+echo "=== Verify parent directory ownership ==="
+DIR_OWNERSHIP_OK=true
+DIR_CHECKED=0
+
+# Collect unique parent directories (up to but not including HOME)
+PARENT_DIRS_FILE="$(mktemp)"
+for f in "${CREATED_FILES[@]}"; do
+  dir="$(dirname "$f")"
+  while [ "$dir" != "$HOME" ] && [ "$dir" != "/" ] && [ ${#dir} -gt ${#HOME} ]; do
+    echo "$dir"
+    dir="$(dirname "$dir")"
+  done
+done | sort -u > "$PARENT_DIRS_FILE"
+
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    echo "Expected owner: $EXPECTED_OWNER"
+    while IFS= read -r d; do
+      WIN_D=$(cygpath -w "$d")
+      ACTUAL_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
+        "(Get-Acl -LiteralPath '${WIN_D}').Owner" | tr -d '\r')
+      DIR_CHECKED=$((DIR_CHECKED + 1))
+      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
+        echo "  OK: $d"
+      else
+        echo "  FAIL: $d (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
+        DIR_OWNERSHIP_OK=false
+      fi
+    done < "$PARENT_DIRS_FILE"
+    ;;
+  Darwin)
+    echo "Expected owner: $EXPECTED_OWNER"
+    while IFS= read -r d; do
+      ACTUAL_OWNER=$(stat -f '%Su' "$d")
+      DIR_CHECKED=$((DIR_CHECKED + 1))
+      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
+        echo "  OK: $d"
+      else
+        echo "  FAIL: $d (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
+        DIR_OWNERSHIP_OK=false
+      fi
+    done < "$PARENT_DIRS_FILE"
+    ;;
+  Linux)
+    echo "Expected owner: $EXPECTED_OWNER"
+    while IFS= read -r d; do
+      ACTUAL_OWNER=$(stat -c '%U' "$d")
+      DIR_CHECKED=$((DIR_CHECKED + 1))
+      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
+        echo "  OK: $d"
+      else
+        echo "  FAIL: $d (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
+        DIR_OWNERSHIP_OK=false
+      fi
+    done < "$PARENT_DIRS_FILE"
+    ;;
+esac
+
+rm -f "$PARENT_DIRS_FILE"
+
+if [ "$DIR_OWNERSHIP_OK" = true ]; then
+  echo "PASS [dir-ownership]: All $DIR_CHECKED parent dir(s) owned by $EXPECTED_OWNER"
+else
+  echo "FAIL [dir-ownership]: Some parent directories have incorrect ownership"
+  exit 1
+fi
+
+echo ""
 echo "=== Compute Run 1 checksums ==="
 # Deduplicate paths (e.g. cursor and cursor-agent share the same file)
 UNIQUE_FILES_FILE="$(mktemp)"
