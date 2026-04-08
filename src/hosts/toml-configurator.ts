@@ -23,9 +23,10 @@ export function configureTomlFile(options: ConfigureFileOptions): void {
   }
 
   for (const [key, value] of Object.entries(configToMerge)) {
-    if (isPlainObject(value) && isPlainObject(existing[key])) {
-      const filtered = withoutDuplicateUrls(existing[key], value)
-      existing[key] = { ...existing[key], ...filtered }
+    if (isPlainObject(value)) {
+      const existingSection = isPlainObject(existing[key]) ? existing[key] : {}
+      const filtered = withoutDuplicateUrls(existingSection, value)
+      existing[key] = { ...existingSection, ...filtered }
     } else {
       existing[key] = value
     }

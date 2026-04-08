@@ -62,12 +62,20 @@ export function withoutDuplicateUrls(
     if (url) existingUrls.set(url, name)
   }
 
+  const seenUrls = new Map<string, string>()
   const filtered: Record<string, unknown> = {}
   for (const [name, entry] of Object.entries(incomingSection)) {
     const url = getEntryUrl(entry)
     if (url && name !== existingUrls.get(url) && existingUrls.has(url)) {
       log.info(`Skipped server "${name}" — URL already configured under "${existingUrls.get(url)}"`)
       continue
+    }
+    if (url && seenUrls.has(url)) {
+      log.info(`Skipped server "${name}" — URL already in incoming batch under "${seenUrls.get(url)}"`)
+      continue
+    }
+    if (url) {
+      seenUrls.set(url, name)
     }
     filtered[name] = entry
   }
