@@ -28,7 +28,7 @@ function getOwner(filePath: string): string {
       '-NoProfile',
       '-NonInteractive',
       '-Command',
-      `Import-Module Microsoft.PowerShell.Security; (Get-Acl -LiteralPath '${escaped}').Owner`,
+      `(Get-Acl -LiteralPath '${escaped}').Owner`,
     ],
     { encoding: 'utf-8', stdio: 'pipe' },
   ).trim()
