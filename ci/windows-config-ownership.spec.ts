@@ -23,7 +23,7 @@ function runBinary(binaryPath: string, args: string[]): string {
 function getOwner(filePath: string): string {
   const escaped = filePath.replace(/'/g, "''")
   return execFileSync(
-    'powershell.exe',
+    'pwsh.exe',
     [
       '-NoProfile',
       '-NonInteractive',
