@@ -34,6 +34,20 @@ function getOwner(filePath: string): string {
   ).trim()
 }
 
+function resolveExpectedOwner(homeDir: string): string {
+  const escaped = homeDir.replace(/'/g, "''")
+  return execFileSync(
+    'pwsh.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `$p = Get-CimInstance Win32_UserProfile | Where-Object { $_.LocalPath -eq '${escaped}' } | Select-Object -First 1; ([System.Security.Principal.SecurityIdentifier]::new($p.SID)).Translate([System.Security.Principal.NTAccount]).Value`,
+    ],
+    { encoding: 'utf-8', stdio: 'pipe', timeout: 30_000 },
+  ).trim()
+}
+
 function collectManagedPaths(userHomeDir: string): string[] {
   const registry = createGleanRegistry()
   return registry
@@ -86,7 +100,7 @@ describe.skipIf(process.platform !== 'win32')('Windows config ownership integrat
 
     mkdirSync(configDir, { recursive: true })
 
-    const expectedOwner = getOwner(userHomeDir)
+    const expectedOwner = resolveExpectedOwner(userHomeDir)
     const managedPaths = collectManagedPaths(userHomeDir)
     const existingPaths = new Set<string>()
 
