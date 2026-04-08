@@ -75,7 +75,7 @@ function setOwnerWindowsBatch(paths: string[], owner: string): void {
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        `[Console]::OutputEncoding = [Text.Encoding]::UTF8; $o = [System.Security.Principal.NTAccount]'${escapedOwner}'; @(${pathsList}) | ForEach-Object { $p = $_; try { $a = Get-Acl -LiteralPath $p; $a.SetOwner($o); Set-Acl -LiteralPath $p -AclObject $a } catch { Write-Warning "Failed to set owner on ${p}: $_" } }`,
+        `[Console]::OutputEncoding = [Text.Encoding]::UTF8; $o = [System.Security.Principal.NTAccount]'${escapedOwner}'; @(${pathsList}) | ForEach-Object { $p = $_; try { $a = Get-Acl -LiteralPath $p; $a.SetOwner($o); Set-Acl -LiteralPath $p -AclObject $a } catch { Write-Warning "Failed to set owner on $p : $_" } }`,
       ],
       { encoding: 'utf-8', stdio: 'pipe', timeout: 60_000 },
     )
