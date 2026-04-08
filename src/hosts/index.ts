@@ -64,23 +64,23 @@ function resolveProfileOwner(homeDir: string): string | null {
   }
 }
 
-function setOwnerWindows(filePath: string, owner: string): void {
+function setOwnerWindowsBatch(paths: string[], owner: string): void {
+  if (paths.length === 0) return
+  const escapedOwner = owner.replace(/'/g, "''")
+  const pathsList = paths.map((p) => `'${p.replace(/'/g, "''")}'`).join(',')
   try {
-    execFileSync('icacls', [filePath, '/setowner', owner], {
-      stdio: 'pipe',
-      timeout: 30_000,
-    })
+    execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `[Console]::OutputEncoding = [Text.Encoding]::UTF8; $o = [System.Security.Principal.NTAccount]'${escapedOwner}'; @(${pathsList}) | ForEach-Object { $p = $_; try { $a = Get-Acl -LiteralPath $p; $a.SetOwner($o); Set-Acl -LiteralPath $p -AclObject $a } catch { Write-Warning "Failed to set owner on $p : $_" } }`,
+      ],
+      { encoding: 'utf-8', stdio: 'pipe', timeout: 60_000 },
+    )
   } catch (err) {
-    log.warn(`Failed to set owner of ${filePath} to ${owner}: ${err}`)
-  }
-}
-
-function setOwnerWindowsAncestors(filePath: string, stopAt: string, owner: string): void {
-  const stopDir = resolve(stopAt)
-  let dir = dirname(resolve(filePath))
-  while (dir.length > stopDir.length && dir.startsWith(stopDir)) {
-    setOwnerWindows(dir, owner)
-    dir = dirname(dir)
+    log.warn(`Failed to batch-set ownership to ${owner}: ${err}`)
   }
 }
 
@@ -112,6 +112,7 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
   // creates with the correct principal.
   const windowsOwner =
     currentPlatform === 'win32' ? resolveProfileOwner(userHomeDir) ?? username : undefined
+  const windowsOwnerPaths: string[] = []
 
   for (const client of clients) {
     const configPath = client.configPath[currentPlatform]
@@ -160,9 +161,15 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
 
       if (currentPlatform === 'win32' && windowsOwner) {
         if (!lstatSync(resolvedPath).isSymbolicLink()) {
-          setOwnerWindows(resolvedPath, windowsOwner)
+          windowsOwnerPaths.push(resolvedPath)
         }
-        setOwnerWindowsAncestors(resolvedPath, userHomeDir, windowsOwner)
+        // Collect ancestor directories up to (but not including) the home dir
+        const stopDir = resolve(userHomeDir)
+        let dir = dirname(resolve(resolvedPath))
+        while (dir.length > stopDir.length && dir.startsWith(stopDir)) {
+          windowsOwnerPaths.push(dir)
+          dir = dirname(dir)
+        }
       } else if (uid !== undefined && gid !== undefined) {
         if (!lstatSync(resolvedPath).isSymbolicLink()) {
           chownSync(resolvedPath, uid, gid)
@@ -176,6 +183,10 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
       log.error(`Failed to configure ${client.displayName}: ${message}`)
       results.push({ error: message, host: client.displayName, success: false })
     }
+  }
+
+  if (windowsOwner && windowsOwnerPaths.length > 0) {
+    setOwnerWindowsBatch([...new Set(windowsOwnerPaths)], windowsOwner)
   }
 
   return results
