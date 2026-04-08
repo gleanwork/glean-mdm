@@ -164,7 +164,7 @@ jobs:
             --define 'process.env.BUILD_VERSION="0.1.0"' `
             --outfile dist/glean-mdm.exe
       - name: Run Windows-native ownership integration test
-        run: bunx vitest run ci/windows-config-ownership.spec.ts
+        run: bunx vitest run --config ci/vitest.windows.config.ts
 
   e2e-schedule:
     strategy:

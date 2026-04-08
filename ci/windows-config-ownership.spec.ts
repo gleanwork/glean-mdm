@@ -51,7 +51,7 @@ function collectMissingAncestors(filePath: string, stopAt: string, existingPaths
   return missingDirs.reverse()
 }
 
-describe('Windows config ownership integration', () => {
+describe.skipIf(process.platform !== 'win32')('Windows config ownership integration', () => {
   const binaryPath = process.env.GLEAN_MDM_BINARY
   const userHomeDir = homedir()
   const configDir = join(tmpdir(), `glean-mdm-win-config-${Date.now()}`)
@@ -77,7 +77,6 @@ describe('Windows config ownership integration', () => {
   })
 
   it('assigns the current user as owner for newly created config files and directories', () => {
-    expect(process.platform).toBe('win32')
     expect(binaryPath).toBeTruthy()
 
     mkdirSync(configDir, { recursive: true })
