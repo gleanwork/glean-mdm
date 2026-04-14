@@ -49,12 +49,17 @@ function chownAncestors(filePath: string, stopAt: string, uid: number, gid: numb
   }
 }
 
-function resolveProfileOwner(homeDir: string): string | null {
+export function resolveProfileOwner(homeDir: string): string | null {
   try {
     const escaped = homeDir.replace(/'/g, "''")
     const output = execFileSync(
       'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', `[Console]::OutputEncoding = [Text.Encoding]::UTF8; (Get-Acl -LiteralPath '${escaped}').Owner`],
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `[Console]::OutputEncoding = [Text.Encoding]::UTF8; $p = Get-CimInstance Win32_UserProfile | Where-Object { $_.LocalPath -eq '${escaped}' } | Select-Object -First 1; if ($p) { ([System.Security.Principal.SecurityIdentifier]::new($p.SID)).Translate([System.Security.Principal.NTAccount]).Value }`,
+      ],
       { encoding: 'utf-8', stdio: 'pipe', timeout: 30_000 },
     )
     const owner = output.trim()
@@ -64,7 +69,7 @@ function resolveProfileOwner(homeDir: string): string | null {
   }
 }
 
-function setOwnerWindowsBatch(paths: string[], owner: string): void {
+export function setOwnerWindowsBatch(paths: string[], owner: string): void {
   if (paths.length === 0) return
   const escapedOwner = owner.replace(/'/g, "''")
   const pathsList = paths.map((p) => `'${p.replace(/'/g, "''")}'`).join(',')
