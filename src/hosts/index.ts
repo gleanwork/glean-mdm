@@ -49,7 +49,7 @@ function chownAncestors(filePath: string, stopAt: string, uid: number, gid: numb
   }
 }
 
-function resolveProfileOwner(homeDir: string): string | null {
+export function resolveProfileOwner(homeDir: string): string | null {
   try {
     const escaped = homeDir.replace(/'/g, "''")
     const output = execFileSync(

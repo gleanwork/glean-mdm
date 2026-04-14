@@ -205,7 +205,7 @@ case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     WIN_HOME=$(cygpath -w "$HOME")
     EXPECTED_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
-      "(Get-Acl -LiteralPath '${WIN_HOME}').Owner" | tr -d '\r')
+      "\$p = Get-CimInstance Win32_UserProfile | Where-Object { \$_.LocalPath -eq '${WIN_HOME}' } | Select-Object -First 1; ([System.Security.Principal.SecurityIdentifier]::new(\$p.SID)).Translate([System.Security.Principal.NTAccount]).Value" | tr -d '\r')
     echo "Expected owner: $EXPECTED_OWNER"
 
     # Deduplicate paths (some hosts share the same config file)
