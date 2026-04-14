@@ -69,7 +69,7 @@ export function resolveProfileOwner(homeDir: string): string | null {
   }
 }
 
-function setOwnerWindowsBatch(paths: string[], owner: string): void {
+export function setOwnerWindowsBatch(paths: string[], owner: string): void {
   if (paths.length === 0) return
   const escapedOwner = owner.replace(/'/g, "''")
   const pathsList = paths.map((p) => `'${p.replace(/'/g, "''")}'`).join(',')
