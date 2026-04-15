@@ -152,4 +152,33 @@ describe('setOwnerWindowsBatch', () => {
     expect(() => setOwnerWindowsBatch(['C:\\file.json'], 'DOMAIN\\user')).not.toThrow()
     expect(log.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to batch-set ownership'))
   })
+
+  it('scales timeout dynamically with path count', () => {
+    mockExecFileSync.mockReturnValue('')
+
+    const paths = Array.from({ length: 21 }, (_, i) => `C:\\Users\\johns\\file${i}.json`)
+    setOwnerWindowsBatch(paths, 'DOMAIN\\johns')
+
+    const options = mockExecFileSync.mock.calls[0][2] as { timeout: number }
+    expect(options.timeout).toBe(21 * 15_000)
+  })
+
+  it('uses minimum 60s timeout for small path counts', () => {
+    mockExecFileSync.mockReturnValue('')
+
+    setOwnerWindowsBatch(['C:\\Users\\johns\\.claude.json'], 'DOMAIN\\johns')
+
+    const options = mockExecFileSync.mock.calls[0][2] as { timeout: number }
+    expect(options.timeout).toBe(60_000)
+  })
+
+  it('uses -ErrorAction Stop on Get-Acl and Set-Acl', () => {
+    mockExecFileSync.mockReturnValue('')
+
+    setOwnerWindowsBatch(['C:\\file.json'], 'DOMAIN\\user')
+
+    const command = mockExecFileSync.mock.calls[0][1][3] as string
+    expect(command).toContain('Get-Acl -LiteralPath $p -ErrorAction Stop')
+    expect(command).toContain('Set-Acl -LiteralPath $p -AclObject $a -ErrorAction Stop')
+  })
 })
