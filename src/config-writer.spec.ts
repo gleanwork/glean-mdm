@@ -320,4 +320,61 @@ describe('writeConfig', () => {
     expect(mcp).toHaveLength(3)
     expect(mcp.map((e: { serverName: string }) => e.serverName)).toEqual(['server_a', 'server_b', 'server_c'])
   })
+
+  it('normalizes hyphens to underscores in serverName', () => {
+    writeConfig({
+      serverName: 'glean-default',
+      serverUrl: 'https://example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    const mcp = JSON.parse(readFileSync(join(outputDir, 'mcp-config.json'), 'utf-8'))
+    expect(mcp).toHaveLength(1)
+    expect(mcp[0].serverName).toBe('glean_default')
+  })
+
+  it('deduplicates hyphenated serverName against existing underscored entry', () => {
+    writeConfig({
+      serverName: 'glean_default',
+      serverUrl: 'https://example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    writeConfig({
+      serverName: 'glean-default',
+      serverUrl: 'https://other.example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    const mcp = JSON.parse(readFileSync(join(outputDir, 'mcp-config.json'), 'utf-8'))
+    expect(mcp).toHaveLength(1)
+    expect(mcp[0].serverName).toBe('glean_default')
+  })
+
+  it('skips new entry when existing hyphenated entry normalizes to same name', () => {
+    const mcpPath = join(outputDir, 'mcp-config.json')
+    writeFileSync(
+      mcpPath,
+      JSON.stringify([{ serverName: 'glean-default', url: 'https://example.com/mcp/default' }]) + '\n',
+    )
+
+    writeConfig({
+      serverName: 'glean_default',
+      serverUrl: 'https://other.example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    // The existing entry is recognized as a duplicate after normalization,
+    // so no new entry is appended
+    const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'))
+    expect(mcp).toHaveLength(1)
+  })
 })
