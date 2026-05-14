@@ -29,7 +29,7 @@ jobs:
           - os: macos-latest
             target: bun-darwin-arm64
             ext: ""
-          - os: windows-latest
+          - os: windows-2025-vs2026
             target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
@@ -92,7 +92,7 @@ jobs:
           - os: macos-latest
             target: bun-darwin-arm64
             ext: ""
-          - os: windows-latest
+          - os: windows-2025-vs2026
             target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
@@ -126,7 +126,7 @@ jobs:
           - os: macos-latest
             target: bun-darwin-arm64
             ext: ""
-          - os: windows-latest
+          - os: windows-2025-vs2026
             target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
@@ -160,7 +160,7 @@ jobs:
           - os: macos-latest
             target: bun-darwin-arm64
             ext: ""
-          - os: windows-latest
+          - os: windows-2025-vs2026
             target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
@@ -194,7 +194,7 @@ jobs:
           - os: macos-latest
             target: bun-darwin-arm64
             ext: ""
-          - os: windows-latest
+          - os: windows-2025-vs2026
             target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
