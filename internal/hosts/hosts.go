@@ -3,6 +3,7 @@
 package hosts
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gleanwork/glean-mdm/internal/config"
+	"github.com/gleanwork/glean-mdm/internal/executil"
 	"github.com/gleanwork/glean-mdm/internal/logger"
 	"github.com/gleanwork/glean-mdm/internal/platform"
 	"github.com/gleanwork/glean-mdm/internal/registry"
@@ -86,20 +88,11 @@ func SetOwnerWindowsBatch(paths []string, owner string) {
 
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
 	timeout := time.Duration(max(60_000, len(paths)*15_000)) * time.Millisecond
-	done := make(chan error, 1)
-	if err := cmd.Start(); err != nil {
-		logger.Warn("Failed to batch-set ownership to %s: %v", owner, err)
-		return
-	}
-	go func() { done <- cmd.Wait() }()
-	select {
-	case err := <-done:
-		if err != nil {
-			logger.Warn("Failed to batch-set ownership to %s: %v", owner, err)
-		}
-	case <-time.After(timeout):
-		_ = cmd.Process.Kill()
+	switch err := executil.RunWithTimeout(cmd, timeout); {
+	case errors.Is(err, executil.ErrTimeout):
 		logger.Warn("Failed to batch-set ownership to %s: timed out", owner)
+	case err != nil:
+		logger.Warn("Failed to batch-set ownership to %s: %v", owner, err)
 	}
 }
 

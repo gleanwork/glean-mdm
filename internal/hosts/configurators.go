@@ -3,11 +3,11 @@ package hosts
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 
 	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 
+	"github.com/gleanwork/glean-mdm/internal/fsutil"
 	"github.com/gleanwork/glean-mdm/internal/jsonutil"
 	"github.com/gleanwork/glean-mdm/internal/logger"
 )
@@ -42,77 +42,48 @@ func mergeConfig(existing, configToMerge map[string]any) map[string]any {
 	return existing
 }
 
-func atomicWrite(filePath string, data []byte) error {
-	writePath := resolveWritePath(filePath)
-	if err := os.MkdirAll(filepath.Dir(writePath), 0o755); err != nil {
+// codec captures the format-specific (un)marshaling and log label for a host
+// config file. Everything else about configuring a file is format-agnostic.
+type codec struct {
+	name      string
+	unmarshal func([]byte, any) error
+	marshal   func(any) ([]byte, error)
+}
+
+var (
+	jsonCodec = codec{name: "JSON", unmarshal: json.Unmarshal, marshal: jsonutil.MarshalIndent}
+	tomlCodec = codec{name: "TOML", unmarshal: toml.Unmarshal, marshal: toml.Marshal}
+	yamlCodec = codec{name: "YAML", unmarshal: yaml.Unmarshal, marshal: yaml.Marshal}
+)
+
+func configureFile(configToMerge map[string]any, filePath string, c codec) error {
+	existing := map[string]any{}
+	if raw, err := os.ReadFile(filePath); err == nil {
+		var parsed map[string]any
+		if c.unmarshal(raw, &parsed) == nil && parsed != nil {
+			existing = parsed
+		}
+	}
+
+	data, err := c.marshal(mergeConfig(existing, configToMerge))
+	if err != nil {
 		return err
 	}
-	tmp := writePath + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := fsutil.AtomicWrite(filePath, data); err != nil {
 		return err
 	}
-	return os.Rename(tmp, writePath)
+	logger.Info("Configured %s: %s", c.name, filePath)
+	return nil
 }
 
 func configureJSONFile(configToMerge map[string]any, filePath string) error {
-	existing := map[string]any{}
-	if raw, err := os.ReadFile(filePath); err == nil {
-		var parsed map[string]any
-		if json.Unmarshal(raw, &parsed) == nil && parsed != nil {
-			existing = parsed
-		}
-	}
-
-	merged := mergeConfig(existing, configToMerge)
-	data, err := jsonutil.MarshalIndent(merged)
-	if err != nil {
-		return err
-	}
-	if err := atomicWrite(filePath, data); err != nil {
-		return err
-	}
-	logger.Info("Configured JSON: %s", filePath)
-	return nil
+	return configureFile(configToMerge, filePath, jsonCodec)
 }
 
 func configureTOMLFile(configToMerge map[string]any, filePath string) error {
-	existing := map[string]any{}
-	if raw, err := os.ReadFile(filePath); err == nil {
-		var parsed map[string]any
-		if toml.Unmarshal(raw, &parsed) == nil && parsed != nil {
-			existing = parsed
-		}
-	}
-
-	merged := mergeConfig(existing, configToMerge)
-	data, err := toml.Marshal(merged)
-	if err != nil {
-		return err
-	}
-	if err := atomicWrite(filePath, data); err != nil {
-		return err
-	}
-	logger.Info("Configured TOML: %s", filePath)
-	return nil
+	return configureFile(configToMerge, filePath, tomlCodec)
 }
 
 func configureYAMLFile(configToMerge map[string]any, filePath string) error {
-	existing := map[string]any{}
-	if raw, err := os.ReadFile(filePath); err == nil {
-		var parsed map[string]any
-		if yaml.Unmarshal(raw, &parsed) == nil && parsed != nil {
-			existing = parsed
-		}
-	}
-
-	merged := mergeConfig(existing, configToMerge)
-	data, err := yaml.Marshal(merged)
-	if err != nil {
-		return err
-	}
-	if err := atomicWrite(filePath, data); err != nil {
-		return err
-	}
-	logger.Info("Configured YAML: %s", filePath)
-	return nil
+	return configureFile(configToMerge, filePath, yamlCodec)
 }

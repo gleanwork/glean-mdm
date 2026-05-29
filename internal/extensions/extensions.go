@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gleanwork/glean-mdm/internal/executil"
 	"github.com/gleanwork/glean-mdm/internal/logger"
 	"github.com/gleanwork/glean-mdm/internal/platform"
 )
@@ -149,23 +150,7 @@ func runInstallExtension(cliPath, username, extensionsDir string, p platform.Pla
 	} else {
 		cmd = exec.Command("sudo", "-H", "-u", username, cliPath, "--install-extension", extensionID)
 	}
-	return runWithTimeout(cmd, installTimeoutMS*time.Millisecond)
-}
-
-func runWithTimeout(cmd *exec.Cmd, timeout time.Duration) error {
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-	select {
-	case err := <-done:
-		return err
-	case <-time.After(timeout):
-		_ = cmd.Process.Kill()
-		<-done
-		return os.ErrDeadlineExceeded
-	}
+	return executil.RunWithTimeout(cmd, installTimeoutMS*time.Millisecond)
 }
 
 // Install installs the Glean extension for every supported editor found.

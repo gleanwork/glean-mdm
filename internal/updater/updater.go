@@ -171,32 +171,31 @@ func CheckForUpdate(versionURL, binaryURLPrefix, pinnedVersion string) bool {
 }
 
 func downloadAndInstall(binaryURLPrefix, target, targetVersion, tmpDir, tmpPath, binaryPath, expectedChecksum string, currentPlatform platform.Platform) bool {
+	// fail logs the error, cleans up the temp dir, and reports failure.
+	fail := func(err error) bool {
+		logger.Error("Update failed: %v", err)
+		_ = os.RemoveAll(tmpDir)
+		return false
+	}
+
 	binaryURL := getBinaryURL(binaryURLPrefix, target, targetVersion)
 	logger.Info("Downloading binary from %s", binaryURL)
 
 	resp, err := http.Get(binaryURL)
 	if err != nil {
-		logger.Error("Update failed: %v", err)
-		_ = os.RemoveAll(tmpDir)
-		return false
+		return fail(err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		resp.Body.Close()
-		logger.Error("Update failed: HTTP %d", resp.StatusCode)
-		_ = os.RemoveAll(tmpDir)
-		return false
+		return fail(fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 	buffer, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		logger.Error("Update failed: %v", err)
-		_ = os.RemoveAll(tmpDir)
-		return false
+		return fail(err)
 	}
 	if err := os.WriteFile(tmpPath, buffer, 0o600); err != nil {
-		logger.Error("Update failed: %v", err)
-		_ = os.RemoveAll(tmpDir)
-		return false
+		return fail(err)
 	}
 
 	if expectedChecksum != "" {
@@ -212,14 +211,10 @@ func downloadAndInstall(binaryURLPrefix, target, targetVersion, tmpDir, tmpPath,
 		installWindows(tmpPath, binaryPath)
 	} else {
 		if err := os.Chmod(tmpPath, 0o755); err != nil {
-			logger.Error("Update failed: %v", err)
-			_ = os.RemoveAll(tmpDir)
-			return false
+			return fail(err)
 		}
 		if err := os.Rename(tmpPath, binaryPath); err != nil {
-			logger.Error("Update failed: %v", err)
-			_ = os.RemoveAll(tmpDir)
-			return false
+			return fail(err)
 		}
 		if currentPlatform == platform.Darwin {
 			_ = exec.Command("xattr", "-d", "com.apple.quarantine", binaryPath).Run()

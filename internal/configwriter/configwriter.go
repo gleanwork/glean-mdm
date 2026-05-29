@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/gleanwork/glean-mdm/internal/config"
+	"github.com/gleanwork/glean-mdm/internal/fsutil"
 	"github.com/gleanwork/glean-mdm/internal/jsonutil"
 	"github.com/gleanwork/glean-mdm/internal/logger"
 	"github.com/gleanwork/glean-mdm/internal/platform"
@@ -35,13 +36,6 @@ type mdmOutput struct {
 	BinaryURLPrefix string `json:"binaryUrlPrefix"`
 }
 
-func resolveWritePath(filePath string) string {
-	if resolved, err := filepath.EvalSymlinks(filePath); err == nil {
-		return resolved
-	}
-	return filePath
-}
-
 func readExistingMcpEntries(filePath string) ([]config.McpServerEntry, error) {
 	raw, err := os.ReadFile(filePath)
 	if err != nil {
@@ -55,17 +49,6 @@ func readExistingMcpEntries(filePath string) ([]config.McpServerEntry, error) {
 		return nil, err
 	}
 	return cfg.Servers, nil
-}
-
-func atomicWrite(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
 }
 
 // Write generates the mcp-config.json and mdm-config.json files.
@@ -131,7 +114,7 @@ func Write(opts Options) error {
 		if err != nil {
 			return err
 		}
-		if err := atomicWrite(resolveWritePath(mcpPath), data); err != nil {
+		if err := fsutil.AtomicWrite(mcpPath, data); err != nil {
 			return err
 		}
 		logger.Info("Added entry %q to %s", newEntry.ServerName, mcpPath)
@@ -147,7 +130,7 @@ func Write(opts Options) error {
 	if err != nil {
 		return err
 	}
-	if err := atomicWrite(resolveWritePath(mdmPath), mdmData); err != nil {
+	if err := fsutil.AtomicWrite(mdmPath, mdmData); err != nil {
 		return err
 	}
 	logger.Info("Wrote %s", mdmPath)

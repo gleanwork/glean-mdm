@@ -3,6 +3,7 @@ package platform
 
 import (
 	"fmt"
+	"path/filepath"
 	"runtime"
 )
 
@@ -72,34 +73,19 @@ func GetDefaultConfigDir() string {
 
 // GetDefaultMcpConfigPath returns the platform-specific mcp-config.json path.
 func GetDefaultMcpConfigPath() string {
-	switch Get() {
-	case Darwin:
-		return "/Library/Application Support/Glean MDM/mcp-config.json"
-	case Linux:
-		return "/etc/glean_mdm/mcp-config.json"
-	case Win32:
-		return `C:\ProgramData\Glean MDM\mcp-config.json`
-	}
-	return ""
+	return filepath.Join(GetDefaultConfigDir(), "mcp-config.json")
 }
 
 // GetDefaultMdmConfigPath returns the platform-specific mdm-config.json path.
 func GetDefaultMdmConfigPath() string {
-	switch Get() {
-	case Darwin:
-		return "/Library/Application Support/Glean MDM/mdm-config.json"
-	case Linux:
-		return "/etc/glean_mdm/mdm-config.json"
-	case Win32:
-		return `C:\ProgramData\Glean MDM\mdm-config.json`
-	}
-	return ""
+	return filepath.Join(GetDefaultConfigDir(), "mdm-config.json")
 }
 
-// GetLogFilePath returns the platform-specific log file path.
+// GetLogFilePath returns the platform-specific log file path. On Windows the
+// log lives in the config dir; Unix uses the system log directory.
 func GetLogFilePath() string {
 	if Get() == Win32 {
-		return `C:\ProgramData\Glean MDM\glean-mdm.log`
+		return filepath.Join(GetDefaultConfigDir(), "glean-mdm.log")
 	}
 	return "/var/log/glean-mdm.log"
 }

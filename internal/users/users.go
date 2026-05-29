@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gleanwork/glean-mdm/internal/executil"
 	"github.com/gleanwork/glean-mdm/internal/logger"
 	"github.com/gleanwork/glean-mdm/internal/platform"
 )
@@ -165,37 +166,17 @@ func ActiveSessionUsers() (map[string]bool, bool) {
 	}
 
 	cmd := exec.Command("who")
-	out, err := runWithTimeout(cmd, 5*time.Second)
-	if err != nil {
+	out := &strings.Builder{}
+	cmd.Stdout = out
+	if err := executil.RunWithTimeout(cmd, 5*time.Second); err != nil {
 		return nil, false
 	}
 	set := map[string]bool{}
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
 		fields := regexp.MustCompile(`\s+`).Split(strings.TrimSpace(line), -1)
 		if len(fields) > 0 && fields[0] != "" {
 			set[fields[0]] = true
 		}
 	}
 	return set, true
-}
-
-func runWithTimeout(cmd *exec.Cmd, timeout time.Duration) ([]byte, error) {
-	out := &strings.Builder{}
-	cmd.Stdout = out
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-	select {
-	case err := <-done:
-		if err != nil {
-			return nil, err
-		}
-		return []byte(out.String()), nil
-	case <-time.After(timeout):
-		_ = cmd.Process.Kill()
-		<-done
-		return nil, os.ErrDeadlineExceeded
-	}
 }

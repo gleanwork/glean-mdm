@@ -1,7 +1,6 @@
 package hosts
 
 import (
-	"path/filepath"
 	"sort"
 
 	"github.com/gleanwork/glean-mdm/internal/logger"
@@ -11,13 +10,6 @@ import (
 // urlPropertyNames is the set of URL property names across all clients, used to
 // detect duplicate server entries (mirrors getAllUrlPropertyNames).
 var urlPropertyNames = registry.URLPropertyNames()
-
-func resolveWritePath(filePath string) string {
-	if resolved, err := filepath.EvalSymlinks(filePath); err == nil {
-		return resolved
-	}
-	return filePath
-}
 
 // asObject returns the value as a map if it is a plain object (JSON object /
 // YAML mapping / TOML table), matching isPlainObject.

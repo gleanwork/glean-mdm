@@ -8,10 +8,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/gleanwork/glean-mdm/ci/mockutil"
 )
 
 func main() {
@@ -60,30 +61,13 @@ func main() {
 		http.Error(w, "Not Found", http.StatusNotFound)
 	})
 
-	versionPort := serve(versionMux)
-	binaryPort := serve(binaryMux)
+	versionPort := mockutil.Serve(versionMux)
+	binaryPort := mockutil.Serve(binaryMux)
 
 	fmt.Printf("Version server listening on port %d\n", versionPort)
 	fmt.Printf("Binary server listening on port %d\n", binaryPort)
-	writePort(*portFile, versionPort)
-	writePort(*binaryPortFile, binaryPort)
+	mockutil.WritePort(*portFile, versionPort)
+	mockutil.WritePort(*binaryPortFile, binaryPort)
 
 	select {} // block until killed
-}
-
-func serve(handler http.Handler) int {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "listen failed: %v\n", err)
-		os.Exit(1)
-	}
-	go func() { _ = http.Serve(ln, handler) }()
-	return ln.Addr().(*net.TCPAddr).Port
-}
-
-func writePort(path string, port int) {
-	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d", port)), 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write port file: %v\n", err)
-		os.Exit(1)
-	}
 }
