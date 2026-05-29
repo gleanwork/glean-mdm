@@ -6,8 +6,10 @@ import (
 	"runtime"
 )
 
-// Platform is the normalized operating system identifier, matching Node's
-// process.platform values ("darwin", "linux", "win32").
+// Platform is the normalized operating system identifier. The values
+// ("darwin", "linux", "win32") match the configPath keys in the embedded
+// registry snapshot (internal/registry/registry.json), so Win32 is used rather
+// than "windows".
 type Platform string
 
 const (
