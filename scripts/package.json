@@ -1,0 +1,13 @@
+{
+  "name": "glean-mdm-registry-gen",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only generator that snapshots @gleanwork/mcp-config-schema into internal/registry/registry.json for the Go build to embed.",
+  "scripts": {
+    "generate": "node gen-registry.mjs"
+  },
+  "dependencies": {
+    "@gleanwork/mcp-config-glean": "4.3.0"
+  }
+}

@@ -1,0 +1,226 @@
+{
+  "generatedFrom": "@gleanwork/mcp-config-glean",
+  "serverNamePlaceholder": "glean_GLEANMDMSERVERNAMETOKEN",
+  "serverUrlPlaceholder": "__GLEAN_SERVER_URL__",
+  "urlPropertyNames": [
+    "httpUrl",
+    "serverUrl",
+    "uri",
+    "url"
+  ],
+  "clients": [
+    {
+      "id": "antigravity",
+      "displayName": "Antigravity",
+      "configFormat": "json",
+      "serversPropertyName": "mcpServers",
+      "urlProperty": "serverUrl",
+      "configPath": {
+        "darwin": "$HOME/.gemini/antigravity/mcp_config.json",
+        "linux": "$HOME/.gemini/antigravity/mcp_config.json",
+        "win32": "%USERPROFILE%\\.gemini\\antigravity\\mcp_config.json"
+      },
+      "entryTemplate": {
+        "serverUrl": "__GLEAN_SERVER_URL__",
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    },
+    {
+      "id": "claude-code",
+      "displayName": "Claude Code",
+      "configFormat": "json",
+      "serversPropertyName": "mcpServers",
+      "urlProperty": "url",
+      "configPath": {
+        "darwin": "$HOME/.claude.json",
+        "linux": "$HOME/.claude.json",
+        "win32": "%USERPROFILE%\\.claude.json"
+      },
+      "entryTemplate": {
+        "type": "http",
+        "url": "__GLEAN_SERVER_URL__",
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    },
+    {
+      "id": "codex",
+      "displayName": "Codex",
+      "configFormat": "toml",
+      "serversPropertyName": "mcp_servers",
+      "urlProperty": "url",
+      "configPath": {
+        "darwin": "$HOME/.codex/config.toml",
+        "linux": "$HOME/.codex/config.toml",
+        "win32": "%USERPROFILE%\\.codex\\config.toml"
+      },
+      "entryTemplate": {
+        "url": "__GLEAN_SERVER_URL__",
+        "http_headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    },
+    {
+      "id": "cursor",
+      "displayName": "Cursor",
+      "configFormat": "json",
+      "serversPropertyName": "mcpServers",
+      "urlProperty": "url",
+      "configPath": {
+        "darwin": "$HOME/.cursor/mcp.json",
+        "linux": "$HOME/.cursor/mcp.json",
+        "win32": "%USERPROFILE%\\.cursor\\mcp.json"
+      },
+      "entryTemplate": {
+        "type": "http",
+        "url": "__GLEAN_SERVER_URL__",
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    },
+    {
+      "id": "cursor-agent",
+      "displayName": "Cursor Agent",
+      "configFormat": "json",
+      "serversPropertyName": "mcpServers",
+      "urlProperty": "url",
+      "configPath": {
+        "darwin": "$HOME/.cursor/mcp.json",
+        "linux": "$HOME/.cursor/mcp.json",
+        "win32": "%USERPROFILE%\\.cursor\\mcp.json"
+      },
+      "entryTemplate": {
+        "type": "http",
+        "url": "__GLEAN_SERVER_URL__",
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    },
+    {
+      "id": "gemini",
+      "displayName": "Gemini CLI",
+      "configFormat": "json",
+      "serversPropertyName": "mcpServers",
+      "urlProperty": "httpUrl",
+      "configPath": {
+        "darwin": "$HOME/.gemini/settings.json",
+        "linux": "$HOME/.gemini/settings.json",
+        "win32": "%USERPROFILE%\\.gemini\\settings.json"
+      },
+      "entryTemplate": {
+        "httpUrl": "__GLEAN_SERVER_URL__",
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    },
+    {
+      "id": "goose",
+      "displayName": "Goose",
+      "configFormat": "yaml",
+      "serversPropertyName": "extensions",
+      "urlProperty": "uri",
+      "configPath": {
+        "darwin": "$HOME/.config/goose/config.yaml",
+        "linux": "$HOME/.config/goose/config.yaml",
+        "win32": "%USERPROFILE%\\.config\\goose\\config.yaml"
+      },
+      "entryTemplate": {
+        "enabled": true,
+        "name": "glean_GLEANMDMSERVERNAMETOKEN",
+        "type": "streamable_http",
+        "uri": "__GLEAN_SERVER_URL__",
+        "envs": {},
+        "env_keys": [],
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        },
+        "description": "",
+        "timeout": 300,
+        "bundled": null,
+        "available_tools": []
+      }
+    },
+    {
+      "id": "jetbrains",
+      "displayName": "JetBrains AI Assistant",
+      "configFormat": "json",
+      "serversPropertyName": "mcpServers",
+      "urlProperty": "url",
+      "configPath": {
+        "darwin": null,
+        "linux": null,
+        "win32": null
+      },
+      "entryTemplate": {
+        "type": "http",
+        "url": "__GLEAN_SERVER_URL__",
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    },
+    {
+      "id": "opencode",
+      "displayName": "OpenCode",
+      "configFormat": "json",
+      "serversPropertyName": "mcp",
+      "urlProperty": "url",
+      "configPath": {
+        "darwin": "$HOME/.config/opencode/opencode.json",
+        "linux": "$HOME/.config/opencode/opencode.json",
+        "win32": "%USERPROFILE%\\.config\\opencode\\opencode.json"
+      },
+      "entryTemplate": {
+        "type": "remote",
+        "url": "__GLEAN_SERVER_URL__",
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    },
+    {
+      "id": "vscode",
+      "displayName": "Visual Studio Code",
+      "configFormat": "json",
+      "serversPropertyName": "servers",
+      "urlProperty": "url",
+      "configPath": {
+        "darwin": "$HOME/Library/Application Support/Code/User/mcp.json",
+        "linux": "$HOME/.config/Code/User/mcp.json",
+        "win32": "%APPDATA%\\Code\\User\\mcp.json"
+      },
+      "entryTemplate": {
+        "type": "http",
+        "url": "__GLEAN_SERVER_URL__",
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    },
+    {
+      "id": "windsurf",
+      "displayName": "Windsurf",
+      "configFormat": "json",
+      "serversPropertyName": "mcpServers",
+      "urlProperty": "serverUrl",
+      "configPath": {
+        "darwin": "$HOME/.codeium/windsurf/mcp_config.json",
+        "linux": "$HOME/.codeium/windsurf/mcp_config.json",
+        "win32": "%USERPROFILE%\\.codeium\\windsurf\\mcp_config.json"
+      },
+      "entryTemplate": {
+        "serverUrl": "__GLEAN_SERVER_URL__",
+        "headers": {
+          "X-Glean-Metadata": "mdm"
+        }
+      }
+    }
+  ]
+}

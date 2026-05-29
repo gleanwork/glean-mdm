@@ -13,7 +13,7 @@ A CLI tool for IT/MDM administrators to automatically configure MCP (Model Conte
 
 ### Supported hosts
 
-Configuration is driven by [`@gleanwork/mcp-config-glean`](https://www.npmjs.com/package/@gleanwork/mcp-config-glean), which maintains the registry of supported clients and their config file paths. This includes tools like Claude Code, Cursor, VS Code, Windsurf, Goose, Codex, and others.
+The set of supported clients and their config file paths comes from [`@gleanwork/mcp-config-glean`](https://www.npmjs.com/package/@gleanwork/mcp-config-glean) (which wraps `@gleanwork/mcp-config-schema`). That package remains the single source of truth: a build-time generator ([`scripts/gen-registry.mjs`](scripts/gen-registry.mjs)) snapshots it into [`internal/registry/registry.json`](internal/registry/registry.json), which the Go binary embeds. This includes tools like Claude Code, Cursor, VS Code, Windsurf, Goose, Codex, and others.
 
 ## Usage
 
@@ -103,20 +103,34 @@ Or specify custom paths with `--mcp-config` and `--mdm-config`.
 
 ## Development
 
-```bash
-# Install dependencies
-bun install
+This is a Go project (Go 1.26+).
 
+```bash
 # Run tests
-bunx vitest run
+go test ./...
+
+# Vet
+go vet ./...
 
 # Run locally
-bun run src/index.ts -- --version
-bun run src/index.ts -- run --dry-run --mcp-config ci/smoke-dry-run-mcp-config.json --mdm-config ci/smoke-dry-run-mdm-config.json --user $(whoami)
+go run ./cmd/glean-mdm --version
+go run ./cmd/glean-mdm run --dry-run --mcp-config ci/smoke-dry-run-mcp-config.json --mdm-config ci/smoke-dry-run-mdm-config.json --user $(whoami)
 
-# Build binaries for all platforms
+# Build binaries for all platforms (cross-compiled)
 ./build.sh
 ```
+
+### Updating the client registry
+
+The supported-client data is a committed snapshot of `@gleanwork/mcp-config-schema`. To refresh it after bumping the pinned version in [`scripts/package.json`](scripts/package.json):
+
+```bash
+cd scripts
+npm install
+npm run generate   # rewrites internal/registry/registry.json
+```
+
+CI fails if the committed snapshot is out of date with the pinned dependency.
 
 ## Logs
 

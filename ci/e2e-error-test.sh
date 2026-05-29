@@ -9,7 +9,7 @@ CONFIG_DIR="$(mktemp -d)"
 RUN_OUTPUT="$(mktemp)"
 MOCK_PID=""
 
-# Platform-specific paths matching src/platform.ts
+# Platform-specific paths matching internal/platform/platform.go
 case "$(uname -s)" in
   Linux)
     INSTALL_DIR="/usr/local/bin"
@@ -64,6 +64,9 @@ cp "$BINARY" "$INSTALL_PATH"
 chmod 755 "$INSTALL_PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MOCK_BIN="$(mktemp -d)/errormockserver"
+( cd "$REPO_ROOT" && CGO_ENABLED=0 go build -o "$MOCK_BIN" ./ci/e2e-error-mock-server )
 
 start_mock_server() {
   local version_status="$1"
@@ -80,7 +83,7 @@ start_mock_server() {
   : > "$PORT_FILE"
   : > "$BINARY_PORT_FILE"
 
-  bun "$SCRIPT_DIR/e2e-error-mock-server.ts" \
+  "$MOCK_BIN" \
     --version-status "$version_status" \
     --binary-status "$binary_status" \
     --port-file "$PORT_FILE" \

@@ -4,19 +4,46 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  GO_VERSION: "1.26"
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-go@v5
         with:
-          bun-version: latest
+          go-version: ${{ env.GO_VERSION }}
 
-      - run: bun install
+      - run: go vet ./...
 
-      - run: bunx vitest run
+      - run: go test ./...
+
+  registry-snapshot:
+    # Ensures internal/registry/registry.json is in sync with the pinned
+    # @gleanwork/mcp-config-schema version (the source of truth).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Regenerate registry snapshot
+        working-directory: scripts
+        run: |
+          npm install
+          npm run generate
+
+      - name: Verify registry snapshot is up to date
+        run: |
+          if ! git diff --exit-code internal/registry/registry.json; then
+            echo "registry.json is stale. Run 'npm run generate' in scripts/ and commit the result."
+            exit 1
+          fi
 
   e2e-update:
     strategy:
@@ -24,13 +51,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: bun-linux-x64
             ext: ""
           - os: macos-latest
-            target: bun-darwin-arm64
             ext: ""
           - os: windows-2025-vs2026
-            target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
     defaults:
@@ -46,40 +70,37 @@ jobs:
           ref: main
           path: main
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-go@v5
         with:
-          bun-version: latest
-
-      - name: Install dependencies (main)
-        run: bun install
-        working-directory: main
-
-      - name: Install dependencies (PR)
-        run: bun install
-        working-directory: pr
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Build old binary
         run: |
-          bun build src/index.ts \
-            --compile \
-            --target=${{ matrix.target }} \
-            --define "process.env.BUILD_VERSION=\"0.1.0\"" \
-            --outfile dist/glean-mdm-old${{ matrix.ext }}
-        working-directory: main
+          # Build the "old" binary from main. During the migration PR, main is
+          # still the pre-Go tree (no go.mod); fall back to PR sources so the
+          # update mechanism is still exercised. Post-merge, main is Go.
+          if [ -f main/go.mod ]; then
+            SRC=main
+          else
+            echo "main has no go.mod (pre-migration); building old binary from PR sources"
+            SRC=pr
+          fi
+          ( cd "$SRC" && CGO_ENABLED=0 go build \
+            -ldflags "-X github.com/gleanwork/glean-mdm/internal/version.BuildVersion=0.1.0" \
+            -o "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}" ./cmd/glean-mdm )
 
       - name: Build new binary (PR)
-        run: |
-          bun build src/index.ts \
-            --compile \
-            --target=${{ matrix.target }} \
-            --define "process.env.BUILD_VERSION=\"99.0.0\"" \
-            --outfile dist/glean-mdm-new${{ matrix.ext }}
         working-directory: pr
+        run: |
+          CGO_ENABLED=0 go build \
+            -ldflags "-X github.com/gleanwork/glean-mdm/internal/version.BuildVersion=99.0.0" \
+            -o "$GITHUB_WORKSPACE/glean-mdm-new${{ matrix.ext }}" ./cmd/glean-mdm
 
       - name: Run E2E update test
         run: |
-          OLD=main/dist/glean-mdm-old${{ matrix.ext }}
-          pr/ci/e2e-update-test.sh "$OLD" pr/dist/glean-mdm-new${{ matrix.ext }}
+          pr/ci/e2e-update-test.sh \
+            "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}" \
+            "$GITHUB_WORKSPACE/glean-mdm-new${{ matrix.ext }}"
 
   e2e-error-handling:
     strategy:
@@ -87,13 +108,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: bun-linux-x64
             ext: ""
           - os: macos-latest
-            target: bun-darwin-arm64
             ext: ""
           - os: windows-2025-vs2026
-            target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
     defaults:
@@ -101,17 +119,14 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-go@v5
         with:
-          bun-version: latest
-      - run: bun install
+          go-version: ${{ env.GO_VERSION }}
       - name: Build binary
         run: |
-          bun build src/index.ts \
-            --compile \
-            --target=${{ matrix.target }} \
-            --define "process.env.BUILD_VERSION=\"0.1.0\"" \
-            --outfile dist/glean-mdm${{ matrix.ext }}
+          CGO_ENABLED=0 go build \
+            -ldflags "-X github.com/gleanwork/glean-mdm/internal/version.BuildVersion=0.1.0" \
+            -o dist/glean-mdm${{ matrix.ext }} ./cmd/glean-mdm
       - name: Run E2E error handling test
         run: ci/e2e-error-test.sh dist/glean-mdm${{ matrix.ext }}
 
@@ -121,13 +136,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: bun-linux-x64
             ext: ""
           - os: macos-latest
-            target: bun-darwin-arm64
             ext: ""
           - os: windows-2025-vs2026
-            target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
     defaults:
@@ -135,17 +147,14 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-go@v5
         with:
-          bun-version: latest
-      - run: bun install
+          go-version: ${{ env.GO_VERSION }}
       - name: Build binary
         run: |
-          bun build src/index.ts \
-            --compile \
-            --target=${{ matrix.target }} \
-            --define "process.env.BUILD_VERSION=\"0.1.0\"" \
-            --outfile dist/glean-mdm${{ matrix.ext }}
+          CGO_ENABLED=0 go build \
+            -ldflags "-X github.com/gleanwork/glean-mdm/internal/version.BuildVersion=0.1.0" \
+            -o dist/glean-mdm${{ matrix.ext }} ./cmd/glean-mdm
       - name: Run E2E config creation test
         run: ci/e2e-config-test.sh dist/glean-mdm${{ matrix.ext }}
 
@@ -155,13 +164,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: bun-linux-x64
             ext: ""
           - os: macos-latest
-            target: bun-darwin-arm64
             ext: ""
           - os: windows-2025-vs2026
-            target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
     defaults:
@@ -169,17 +175,14 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-go@v5
         with:
-          bun-version: latest
-      - run: bun install
+          go-version: ${{ env.GO_VERSION }}
       - name: Build binary
         run: |
-          bun build src/index.ts \
-            --compile \
-            --target=${{ matrix.target }} \
-            --define "process.env.BUILD_VERSION=\"0.1.0\"" \
-            --outfile dist/glean-mdm${{ matrix.ext }}
+          CGO_ENABLED=0 go build \
+            -ldflags "-X github.com/gleanwork/glean-mdm/internal/version.BuildVersion=0.1.0" \
+            -o dist/glean-mdm${{ matrix.ext }} ./cmd/glean-mdm
       - name: Run E2E schedule test
         run: ci/e2e-schedule-test.sh dist/glean-mdm${{ matrix.ext }}
 
@@ -189,13 +192,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: bun-linux-x64
             ext: ""
           - os: macos-latest
-            target: bun-darwin-arm64
             ext: ""
           - os: windows-2025-vs2026
-            target: bun-windows-x64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
     defaults:
@@ -203,16 +203,13 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-go@v5
         with:
-          bun-version: latest
-      - run: bun install
+          go-version: ${{ env.GO_VERSION }}
       - name: Build binary
         run: |
-          bun build src/index.ts \
-            --compile \
-            --target=${{ matrix.target }} \
-            --define "process.env.BUILD_VERSION=\"0.1.0\"" \
-            --outfile dist/glean-mdm${{ matrix.ext }}
+          CGO_ENABLED=0 go build \
+            -ldflags "-X github.com/gleanwork/glean-mdm/internal/version.BuildVersion=0.1.0" \
+            -o dist/glean-mdm${{ matrix.ext }} ./cmd/glean-mdm
       - name: Run E2E uninstall test
         run: ci/e2e-uninstall-test.sh dist/glean-mdm${{ matrix.ext }}

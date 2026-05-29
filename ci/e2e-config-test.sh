@@ -8,7 +8,7 @@ RUN_OUTPUT="$(mktemp)"
 CHECKSUMS_RUN1="$(mktemp)"
 CHECKSUMS_RUN2="$(mktemp)"
 
-# Platform-specific paths matching src/platform.ts
+# Platform-specific paths matching internal/platform/platform.go
 case "$(uname -s)" in
   Linux)
     INSTALL_DIR="/usr/local/bin"

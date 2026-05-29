@@ -2,7 +2,7 @@
 
 ## Configuration files
 
-All paths are defined in `src/platform.ts`.
+All paths are defined in `internal/platform/platform.go`.
 
 ### Config directory
 

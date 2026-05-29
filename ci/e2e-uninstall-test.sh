@@ -5,7 +5,7 @@ BINARY="${1:?Usage: e2e-uninstall-test.sh <binary>}"
 
 RUN_OUTPUT="$(mktemp)"
 
-# Platform-specific paths matching src/platform.ts and src/scheduler.ts
+# Platform-specific paths matching internal/platform/platform.go and internal/scheduler/scheduler.go
 case "$(uname -s)" in
   Linux)
     INSTALL_DIR="/usr/local/bin"

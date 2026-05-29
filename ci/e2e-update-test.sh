@@ -10,7 +10,7 @@ CONFIG_DIR="$(mktemp -d)"
 RUN_OUTPUT="$(mktemp)"
 MOCK_PID=""
 
-# Platform-specific paths matching src/platform.ts
+# Platform-specific paths matching internal/platform/platform.go
 case "$(uname -s)" in
   Linux)
     INSTALL_DIR="/usr/local/bin"
@@ -67,9 +67,12 @@ chmod 755 "$INSTALL_PATH"
 OLD_VER=$(tr -d '\r' < "$RUN_OUTPUT")
 echo "Old binary version: $OLD_VER"
 
-echo "=== Start mock server ==="
+echo "=== Build and start mock server ==="
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-bun "$SCRIPT_DIR/e2e-mock-server.ts" \
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MOCK_BIN="$(mktemp -d)/mockserver"
+( cd "$REPO_ROOT" && CGO_ENABLED=0 go build -o "$MOCK_BIN" ./ci/e2e-mock-server )
+"$MOCK_BIN" \
   --binary-path "$NEW_BINARY" \
   --version 99.0.0 \
   --port-file "$PORT_FILE" \
