@@ -65,29 +65,44 @@ jobs:
         with:
           path: pr
 
-      - uses: actions/checkout@v6
-        with:
-          ref: main
-          path: main
-
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Build old binary
+      - name: Download latest released binary
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Build the "old" binary from main. During the migration PR, main is
-          # still the pre-Go tree (no go.mod); fall back to PR sources so the
-          # update mechanism is still exercised. Post-merge, main is Go.
-          if [ -f main/go.mod ]; then
-            SRC=main
-          else
-            echo "main has no go.mod (pre-migration); building old binary from PR sources"
-            SRC=pr
-          fi
-          ( cd "$SRC" && CGO_ENABLED=0 go build \
-            -ldflags "-X github.com/gleanwork/glean-mdm/internal/version.BuildVersion=0.1.0" \
-            -o "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}" ./cmd/glean-mdm )
+          case "$(uname -s)" in
+            Linux) os="linux" ;;
+            Darwin) os="darwin" ;;
+            MINGW*|MSYS*|CYGWIN*) os="windows" ;;
+            *)
+              echo "Unsupported platform: $(uname -s)"
+              exit 1
+              ;;
+          esac
+
+          case "$(uname -m)" in
+            x86_64|amd64) arch="x64" ;;
+            arm64|aarch64) arch="arm64" ;;
+            *)
+              echo "Unsupported architecture: $(uname -m)"
+              exit 1
+              ;;
+          esac
+
+          ext=""
+          [ "$os" = "windows" ] && ext=".exe"
+          asset="glean-mdm-${os}-${arch}${ext}"
+          echo "Downloading latest release asset: ${asset}"
+
+          gh release download \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$asset" \
+            --output "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}" \
+            --clobber
+          chmod 755 "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}"
 
       - name: Build new binary (PR)
         working-directory: pr
