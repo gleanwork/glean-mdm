@@ -40,6 +40,36 @@ describe('configureJsonFile', () => {
     })
   })
 
+  it('preserves JavaScript insertion order in raw JSON output', () => {
+    const filePath = join(tempDir, 'mcp.json')
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          glean_default: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+            headers: { 'X-Glean-Metadata': 'mdm' },
+          },
+        },
+      },
+      filePath,
+    })
+
+    expect(readFileSync(filePath, 'utf-8')).toBe(`{
+  "mcpServers": {
+    "glean_default": {
+      "type": "http",
+      "url": "https://example-be.glean.com/mcp/default",
+      "headers": {
+        "X-Glean-Metadata": "mdm"
+      }
+    }
+  }
+}
+`)
+  })
+
   it('merges into an existing config preserving other entries', () => {
     const filePath = join(tempDir, 'mcp.json')
     writeFileSync(
