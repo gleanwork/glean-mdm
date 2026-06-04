@@ -41,31 +41,29 @@ jobs:
         with:
           path: pr
 
-      - uses: actions/checkout@v6
-        with:
-          ref: main
-          path: main
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      - name: Install dependencies (main)
-        run: bun install
-        working-directory: main
 
       - name: Install dependencies (PR)
         run: bun install
         working-directory: pr
 
-      - name: Build old binary
+      - name: Download latest released binary
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          bun build src/index.ts \
-            --compile \
-            --target=${{ matrix.target }} \
-            --define "process.env.BUILD_VERSION=\"0.1.0\"" \
-            --outfile dist/glean-mdm-old${{ matrix.ext }}
-        working-directory: main
+          asset_target="${{ matrix.target }}"
+          asset_target="${asset_target#bun-}"
+          asset="glean-mdm-${asset_target}${{ matrix.ext }}"
+          echo "Downloading latest release asset: ${asset}"
+
+          gh release download \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$asset" \
+            --output "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}" \
+            --clobber
+          chmod 755 "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}"
 
       - name: Build new binary (PR)
         run: |
@@ -78,8 +76,9 @@ jobs:
 
       - name: Run E2E update test
         run: |
-          OLD=main/dist/glean-mdm-old${{ matrix.ext }}
-          pr/ci/e2e-update-test.sh "$OLD" pr/dist/glean-mdm-new${{ matrix.ext }}
+          pr/ci/e2e-update-test.sh \
+            "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}" \
+            pr/dist/glean-mdm-new${{ matrix.ext }}
 
   e2e-error-handling:
     strategy:
