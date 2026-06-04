@@ -360,6 +360,41 @@ describe('configureJsonFile', () => {
     })
   })
 
+  it('uses registry URL-property order when an entry has multiple URL-like fields', () => {
+    const filePath = join(tempDir, 'mcp.json')
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        mcpServers: {
+          mixed_existing: {
+            url: 'https://example-be.glean.com/mcp/default',
+            httpUrl: 'https://other-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          incoming_same_url: {
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+    expect(result.mcpServers).toEqual({
+      mixed_existing: {
+        url: 'https://example-be.glean.com/mcp/default',
+        httpUrl: 'https://other-be.glean.com/mcp/default',
+      },
+    })
+  })
+
   it('deduplicates within incoming entries that share the same URL', () => {
     const filePath = join(tempDir, 'mcp.json')
 
