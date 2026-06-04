@@ -89,6 +89,19 @@ describe('writeConfig', () => {
     ).toThrow(ZodError)
   })
 
+  it('throws ZodError when versionUrl is explicitly empty', () => {
+    expect(() =>
+      writeConfig({
+        serverName: 'glean_default',
+        serverUrl: 'https://example.com/mcp/default',
+        autoUpdate: false,
+        versionUrl: '',
+        binaryUrlPrefix: 'https://example.com/binaries',
+        outputDir,
+      }),
+    ).toThrow(ZodError)
+  })
+
   it('throws ZodError for invalid binaryUrlPrefix', () => {
     expect(() =>
       writeConfig({
