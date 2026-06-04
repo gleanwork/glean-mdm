@@ -177,7 +177,7 @@ async function executeConfig(options: CliOptions): Promise<void> {
   }
 }
 
-function setupProgram(): Command {
+export function setupProgram(): Command {
   const program = new Command()
 
   program

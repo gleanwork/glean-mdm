@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 
-import { buildCliOptions } from './index'
+vi.mock('./config-writer.js', () => ({
+  writeConfig: vi.fn(),
+}))
+
+import { writeConfig } from './config-writer.js'
+import { buildCliOptions, setupProgram } from './index'
 
 describe('buildCliOptions', () => {
   it('builds options for run command with no flags', () => {
@@ -194,5 +199,57 @@ describe('buildCliOptions', () => {
   it('handles keepConfig true for uninstall', () => {
     const result = buildCliOptions('uninstall', {}, { keepConfig: true })
     expect(result.keepConfig).toBe(true)
+  })
+})
+
+
+describe('setupProgram CLI parity', () => {
+  const baseConfigArgs = [
+    'config',
+    '--server-name',
+    'glean_default',
+    '--server-url',
+    'https://example.com/mcp/default',
+    '--binary-url-prefix',
+    'https://example.com/binaries',
+  ]
+
+  beforeEach(() => {
+    ;(writeConfig as Mock).mockReset()
+  })
+
+  async function parse(args: string[]): Promise<void> {
+    const program = setupProgram()
+    program.exitOverride()
+    program.configureOutput({
+      writeErr: () => undefined,
+      writeOut: () => undefined,
+    })
+    await program.parseAsync(['node', 'glean-mdm', ...args])
+  }
+
+  it('uses the last auto-update flag when --auto-update follows --no-auto-update', async () => {
+    await parse([...baseConfigArgs, '--no-auto-update', '--auto-update'])
+
+    expect(writeConfig).toHaveBeenCalledWith(expect.objectContaining({ autoUpdate: true }))
+  })
+
+  it('uses the last auto-update flag when --no-auto-update follows --auto-update', async () => {
+    await parse([...baseConfigArgs, '--auto-update', '--no-auto-update'])
+
+    expect(writeConfig).toHaveBeenCalledWith(expect.objectContaining({ autoUpdate: false }))
+  })
+
+  it('does not expose an extra completion command', () => {
+    const commandNames = setupProgram().commands.map((command) => command.name())
+
+    expect(commandNames).not.toContain('completion')
+  })
+
+  it("keeps Commander's version shorthand as -V and does not claim -v", () => {
+    const versionOption = setupProgram().options.find((option) => option.long === '--version')
+
+    expect(versionOption?.short).toBe('-V')
+    expect(setupProgram().helpInformation()).not.toContain('-v, --version')
   })
 })
