@@ -418,6 +418,78 @@ describe('configureJsonFile', () => {
     })
   })
 
+  it('keeps the first incoming duplicate URL by insertion order, not server name sort order', () => {
+    const filePath = join(tempDir, 'mcp.json')
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          z_server: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+          a_server: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+    expect(Object.keys(result.mcpServers)).toEqual(['z_server'])
+    expect(result.mcpServers.z_server).toEqual({
+      type: 'http',
+      url: 'https://example-be.glean.com/mcp/default',
+    })
+  })
+
+  it('uses existing file order when duplicate existing URLs choose the owner name', () => {
+    const filePath = join(tempDir, 'mcp.json')
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        mcpServers: {
+          z_server: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+          a_server: {
+            type: 'sse',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      }),
+    )
+
+    configureJsonFile({
+      configToMerge: {
+        mcpServers: {
+          a_server: {
+            type: 'http',
+            url: 'https://example-be.glean.com/mcp/default',
+          },
+        },
+      },
+      filePath,
+    })
+
+    const result = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+    expect(result.mcpServers).toEqual({
+      z_server: {
+        type: 'http',
+        url: 'https://example-be.glean.com/mcp/default',
+      },
+      a_server: {
+        type: 'http',
+        url: 'https://example-be.glean.com/mcp/default',
+      },
+    })
+  })
+
   it('preserves symlinks and updates the target file', () => {
     const targetDir = mkdtempSync(join(tmpdir(), 'mdm-json-target-'))
     const targetPath = join(targetDir, 'mcp.json')
