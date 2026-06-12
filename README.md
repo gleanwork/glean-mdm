@@ -138,3 +138,17 @@ git push origin v1.0.0
 ```
 
 This builds cross-platform binaries (macOS arm64/x64, Linux arm64/x64, Windows x64) and publishes them as GitHub release assets.
+
+<!-- configure-agents:skills start -->
+
+## Agent skills
+
+This repository ships agent skill(s) under `skills/`. Install them into your
+AI agent with [`npx skills`](https://github.com/agentskills/agentskills):
+
+```sh
+npx skills add -g gleanwork/glean-mdm   # global — available in every repo
+npx skills add gleanwork/glean-mdm      # or scoped to the current repo
+```
+
+<!-- configure-agents:skills end -->
