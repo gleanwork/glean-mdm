@@ -6,7 +6,12 @@ import { getDefaultMcpConfigPath, getDefaultMdmConfigPath } from './platform.js'
 
 const SEMVER_PATTERN = /^v?\d+\.\d+\.\d+$/
 
+export const gleanMdmMetadataHeaderName = 'X-Glean-Metadata'
+export const gleanMdmMetadataHeaderValue = 'mdm'
+export const gleanMcpServerNameHeaderName = 'X-Glean-MCP-Server-Name'
+
 const McpServerEntrySchema = z.object({
+  headers: z.record(z.string()).optional(),
   serverName: z.string().min(1),
   url: z.string().min(1),
 })
