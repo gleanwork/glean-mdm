@@ -41,7 +41,7 @@ export function writeConfig(options: WriteConfigOptions): void {
   const outputDir = options.outputDir ?? getDefaultConfigDir()
   mkdirSync(outputDir, { recursive: true })
 
-  const newEntry = { serverName: options.serverName, url: options.serverUrl }
+  const newEntry = { serverName: options.serverName.replace(/-/g, '_'), url: options.serverUrl }
   McpConfigSchema.parse([newEntry])
 
   const mdmData: Record<string, unknown> = {
