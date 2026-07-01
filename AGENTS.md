@@ -13,6 +13,6 @@ Runtime is **Bun** (version pinned in `mise.toml`). See `README.md` for the full
 
 ## Skills
 
-This repository ships an agent skill at `skills/SKILL.md` that teaches a consuming AI how to use `@gleanwork/glean-mdm` correctly. It is distributed via `skills.sh`.
+This repository ships an agent skill at `skills/glean-mdm/SKILL.md` that teaches a consuming AI how to use `@gleanwork/glean-mdm` correctly.
 
-When working in this repository, consult `skills/SKILL.md` and keep it accurate as the public API changes.
+When working in this repository, consult `skills/glean-mdm/SKILL.md` and keep it accurate as the public API changes.
