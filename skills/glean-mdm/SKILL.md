@@ -36,7 +36,7 @@ Don't transcribe the flag or schema lists — they drift. Check `--help` and the
 The normal admin workflow is **config → install-schedule → run**:
 
 - **`config`** generates two files into the platform default directory (override with `--output-dir`):
-  - `mcp-config.json` — the MCP server(s) to provision (`serverName`, `url`).
+  - `mcp-config.json` — the MCP server(s) to provision (`serverName`, `url`, optional per-server `headers`).
   - `mdm-config.json` — the binary's own update behavior (`autoUpdate`, `versionUrl`, `binaryUrlPrefix`, `pinnedVersion`).
 - **`install-schedule`** registers the system runner (launchd / systemd / Task Scheduler); `uninstall-schedule` removes it; `uninstall` removes everything (schedule, config, logs, binary).
 - **`run`** does the per-user work: for each local user it installs the Glean editor extension, configures the MCP server entry in each supported host tool, then checks for a self-update. Run it as root/admin so it can enumerate all users and write their configs.

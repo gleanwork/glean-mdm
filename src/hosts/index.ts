@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path'
 
 import { createGleanRegistry } from '@gleanwork/mcp-config-glean'
 
-import { getServerUrl } from '../config.js'
+import { getServerUrl, gleanMdmMetadataHeaderName, gleanMdmMetadataHeaderValue } from '../config.js'
 import type { McpServerEntry } from '../config.js'
 import { log } from '../logger.js'
 import { getPlatform } from '../platform.js'
@@ -138,7 +138,10 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
       for (const server of servers) {
         const serverUrl = getServerUrl(server)
         const generatedConfig = builder.buildConfiguration({
-          headers: { 'X-Glean-Metadata': 'mdm' },
+          headers: {
+            [gleanMdmMetadataHeaderName]: gleanMdmMetadataHeaderValue,
+            ...server.headers,
+          },
           includeRootObject: true,
           serverName: server.serverName,
           serverUrl,

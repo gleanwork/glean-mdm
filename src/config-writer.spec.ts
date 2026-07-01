@@ -23,7 +23,16 @@ describe('writeConfig', () => {
     })
 
     const mcp = JSON.parse(readFileSync(join(outputDir, 'mcp-config.json'), 'utf-8'))
-    expect(mcp).toEqual([{ serverName: 'glean_default', url: 'https://example.com/mcp/default' }])
+    expect(mcp).toEqual([
+      {
+        serverName: 'glean_default',
+        url: 'https://example.com/mcp/default',
+        headers: {
+          'X-Glean-Metadata': 'mdm',
+          'X-Glean-MCP-Server-Name': 'extension-glean_default',
+        },
+      },
+    ])
 
     const mdm = JSON.parse(readFileSync(join(outputDir, 'mdm-config.json'), 'utf-8'))
     expect(mdm).toEqual({
@@ -166,8 +175,22 @@ describe('writeConfig', () => {
 
     const mcp = JSON.parse(readFileSync(join(outputDir, 'mcp-config.json'), 'utf-8'))
     expect(mcp).toHaveLength(2)
-    expect(mcp[0]).toEqual({ serverName: 'server_a', url: 'https://a.example.com/mcp/default' })
-    expect(mcp[1]).toEqual({ serverName: 'server_b', url: 'https://b.example.com/mcp/default' })
+    expect(mcp[0]).toEqual({
+      serverName: 'server_a',
+      url: 'https://a.example.com/mcp/default',
+      headers: {
+        'X-Glean-Metadata': 'mdm',
+        'X-Glean-MCP-Server-Name': 'extension-server_a',
+      },
+    })
+    expect(mcp[1]).toEqual({
+      serverName: 'server_b',
+      url: 'https://b.example.com/mcp/default',
+      headers: {
+        'X-Glean-Metadata': 'mdm',
+        'X-Glean-MCP-Server-Name': 'extension-server_b',
+      },
+    })
   })
 
   it('skips mcp-config.json entry when same serverName already exists', () => {
@@ -210,7 +233,14 @@ describe('writeConfig', () => {
     const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'))
     expect(mcp).toHaveLength(2)
     expect(mcp[0]).toEqual({ serverName: 'legacy_server', url: 'https://legacy.example.com/mcp/default' })
-    expect(mcp[1]).toEqual({ serverName: 'new_server', url: 'https://new.example.com/mcp/default' })
+    expect(mcp[1]).toEqual({
+      serverName: 'new_server',
+      url: 'https://new.example.com/mcp/default',
+      headers: {
+        'X-Glean-Metadata': 'mdm',
+        'X-Glean-MCP-Server-Name': 'extension-new_server',
+      },
+    })
   })
 
   it('skips when serverName exists in a single-object format file', () => {
@@ -286,7 +316,14 @@ describe('writeConfig', () => {
     const mcp = JSON.parse(readFileSync(mcpTarget, 'utf-8'))
     expect(mcp).toEqual([
       { serverName: 'existing', url: 'https://existing.com/mcp' },
-      { serverName: 'glean_default', url: 'https://example.com/mcp/default' },
+      {
+        serverName: 'glean_default',
+        url: 'https://example.com/mcp/default',
+        headers: {
+          'X-Glean-Metadata': 'mdm',
+          'X-Glean-MCP-Server-Name': 'extension-glean_default',
+        },
+      },
     ])
 
     const mdm = JSON.parse(readFileSync(mdmTarget, 'utf-8'))
