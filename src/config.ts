@@ -9,7 +9,7 @@ const SEMVER_PATTERN = /^v?\d+\.\d+\.\d+$/
 const McpServerEntrySchema = z.object({
   serverName: z.string().min(1),
   url: z.string().min(1),
-})
+}).passthrough()
 
 export const McpConfigSchema = z
   .union([z.array(McpServerEntrySchema).min(1), McpServerEntrySchema])
@@ -28,6 +28,7 @@ export const MdmConfigSchema = z
       z.string().url(),
     ),
   })
+  .passthrough()
   .refine((data) => !data.autoUpdate || data.versionUrl !== undefined, {
     message: 'versionUrl is required when autoUpdate is true',
     path: ['versionUrl'],

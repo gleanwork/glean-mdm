@@ -1,4 +1,4 @@
-import { lstatSync, mkdtempSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -332,5 +332,49 @@ describe('writeConfig', () => {
     const mcp = JSON.parse(readFileSync(join(outputDir, 'mcp-config.json'), 'utf-8'))
     expect(mcp).toHaveLength(3)
     expect(mcp.map((e: { serverName: string }) => e.serverName)).toEqual(['server_a', 'server_b', 'server_c'])
+  })
+
+  it('preserves malformed mcp-config.json and does not write mdm-config.json', () => {
+    const mcpPath = join(outputDir, 'mcp-config.json')
+    const original = '{"serverName":'
+    writeFileSync(mcpPath, original)
+
+    expect(() =>
+      writeConfig({
+        serverName: 'glean_default',
+        serverUrl: 'https://example.com/mcp/default',
+        autoUpdate: false,
+        binaryUrlPrefix: 'https://example.com/binaries',
+        outputDir,
+      }),
+    ).toThrow()
+
+    expect(readFileSync(mcpPath, 'utf-8')).toBe(original)
+    expect(existsSync(join(outputDir, 'mdm-config.json'))).toBe(false)
+  })
+
+  it('preserves unknown fields when appending an MCP server', () => {
+    const mcpPath = join(outputDir, 'mcp-config.json')
+    writeFileSync(
+      mcpPath,
+      JSON.stringify([
+        {
+          serverName: 'existing',
+          url: 'https://existing.example.com/mcp',
+          futureField: { enabled: true },
+        },
+      ]),
+    )
+
+    writeConfig({
+      serverName: 'glean_default',
+      serverUrl: 'https://example.com/mcp/default',
+      autoUpdate: false,
+      binaryUrlPrefix: 'https://example.com/binaries',
+      outputDir,
+    })
+
+    const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'))
+    expect(mcp[0].futureField).toEqual({ enabled: true })
   })
 })

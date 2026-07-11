@@ -1,16 +1,6 @@
-import { realpathSync } from 'node:fs'
-
 import { createGleanRegistry } from '@gleanwork/mcp-config-glean'
 
 import { log } from '../logger.js'
-
-export function resolveWritePath(filePath: string): string {
-  try {
-    return realpathSync(filePath)
-  } catch {
-    return filePath
-  }
-}
 
 export function isPlainObject(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val)

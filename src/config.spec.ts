@@ -53,6 +53,7 @@ describe('McpConfigSchema', () => {
     })
 
     expect(result.success).toBe(true)
+    if (result.success) expect(result.data[0].someNewField).toBe('future-value')
   })
 })
 
@@ -76,6 +77,7 @@ describe('MdmConfigSchema', () => {
     })
 
     expect(result.success).toBe(true)
+    if (result.success) expect(result.data.someNewField).toBe('future-value')
   })
 
   describe('autoUpdate', () => {
