@@ -10,14 +10,23 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.3.13
+
+      - name: Verify Bun version pin
+        run: |
+          expected="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["bun"])')"
+          actual="$(bun --version)"
+          if [ "$actual" != "$expected" ]; then
+            echo "Expected Bun $expected from mise.toml, got $actual"
+            exit 1
+          fi
 
       - name: Install dependencies
         run: bun install
@@ -25,7 +34,11 @@ jobs:
       - name: Build binaries for all platforms
         env:
           MDM_VERSION: ${{ github.ref_name }}
+          REQUIRE_DARWIN_CODESIGN: "1"
         run: ./build.sh
+
+      - name: Verify macOS 27 compatibility and release artifacts
+        run: ci/verify-release-artifacts.sh dist "${{ github.ref_name }}"
 
       - uses: softprops/action-gh-release@v2
         with:
