@@ -37,7 +37,7 @@ jobs:
           REQUIRE_DARWIN_CODESIGN: "1"
         run: ./build.sh
 
-      - name: Verify macOS 27 compatibility and release artifacts
+      - name: Verify macOS codesign compatibility and release artifacts
         run: ci/verify-release-artifacts.sh dist "${{ github.ref_name }}"
 
       - uses: softprops/action-gh-release@v2
