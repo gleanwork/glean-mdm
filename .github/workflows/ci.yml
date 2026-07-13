@@ -23,18 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Read Bun version
+        id: bun-version
+        run: echo "version=$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["bun"])')" >> "$GITHUB_OUTPUT"
+
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.13
-
-      - name: Verify Bun version pin
-        run: |
-          expected="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["bun"])')"
-          actual="$(bun --version)"
-          if [ "$actual" != "$expected" ]; then
-            echo "Expected Bun $expected from mise.toml, got $actual"
-            exit 1
-          fi
+          bun-version: ${{ steps.bun-version.outputs.version }}
 
       - run: bun install
 
