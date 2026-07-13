@@ -10,14 +10,18 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
+
+      - name: Read Bun version
+        id: bun-version
+        run: echo "version=$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["bun"])')" >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ steps.bun-version.outputs.version }}
 
       - name: Install dependencies
         run: bun install
@@ -25,7 +29,11 @@ jobs:
       - name: Build binaries for all platforms
         env:
           MDM_VERSION: ${{ github.ref_name }}
+          REQUIRE_DARWIN_CODESIGN: "1"
         run: ./build.sh
+
+      - name: Verify macOS codesign compatibility and release artifacts
+        run: ci/verify-release-artifacts.sh dist "${{ github.ref_name }}"
 
       - uses: softprops/action-gh-release@v2
         with:

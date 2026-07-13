@@ -28,6 +28,22 @@ for target in \
     --outfile "${DIST_DIR}/${outname}"
 done
 
+if command -v codesign >/dev/null 2>&1; then
+  echo "Signing macOS binaries..."
+  for binary in \
+    "${DIST_DIR}/glean-mdm-darwin-arm64" \
+    "${DIST_DIR}/glean-mdm-darwin-x64"; do
+    codesign --remove-signature "$binary" >/dev/null 2>&1 || true
+    codesign --force --sign - "$binary"
+    codesign --verify --strict --verbose=4 "$binary"
+  done
+elif [ "${REQUIRE_DARWIN_CODESIGN:-0}" = "1" ]; then
+  echo "ERROR: codesign is required to build release artifacts" >&2
+  exit 1
+else
+  echo "Skipping macOS code signing because codesign is unavailable"
+fi
+
 echo "Generating checksums and version.json..."
 cd "$DIST_DIR"
 
