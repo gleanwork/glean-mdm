@@ -3,13 +3,12 @@ import { ZodError } from 'zod'
 
 import { getServerUrl, readMcpConfig, readMdmConfig } from './config.js'
 import { writeConfig } from './config-writer.js'
-import { installExtensions } from './extensions/index.js'
 import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
 import { fullUninstall } from './uninstaller.js'
 import { checkForUpdate } from './updater.js'
-import { enumerateUsers, getActiveSessionUsers, lookupUser } from './users.js'
+import { enumerateUsers, lookupUser } from './users.js'
 import { BUILD_VERSION } from './version.js'
 
 export interface CliOptions {
@@ -107,40 +106,7 @@ async function executeRun(options: CliOptions): Promise<void> {
 
   log.info(`Hosts: ${totalSuccess} configured, ${totalFailure} failed`)
 
-  let extensionSuccess = 0
-  let extensionFailure = 0
-
-  const activeUsers = getActiveSessionUsers()
-  if (activeUsers === null) {
-    log.warn('Could not determine active sessions; installing extensions for all users')
-  }
-
-  for (const user of users) {
-    if (activeUsers !== null && !activeUsers.has(user.username)) {
-      log.info(`Skipping extensions for ${user.username} (no active session)`)
-      continue
-    }
-
-    log.info(`Installing extensions for ${user.username} (${user.homeDir})`)
-
-    const extResults = installExtensions({
-      dryRun: options.dryRun,
-      gid: user.gid,
-      uid: user.uid,
-      userHomeDir: user.homeDir,
-      username: user.username,
-    })
-
-    for (const result of extResults) {
-      if (result.skipped) continue
-      if (result.success) extensionSuccess++
-      else extensionFailure++
-    }
-  }
-
-  log.info(`Extensions: ${extensionSuccess} installed, ${extensionFailure} failed`)
-
-  if (totalFailure > 0 || extensionFailure > 0) {
+  if (totalFailure > 0) {
     process.exit(1)
   }
 }
