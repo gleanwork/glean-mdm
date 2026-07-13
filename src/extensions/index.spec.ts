@@ -1,14 +1,20 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { findEditorCli, findOldExtensionDirs, removeExtensionDirs } from './index'
+import { findEditorCli, findOldExtensionDirs, removeExtensionDirs, runInstallExtension } from './index'
+
+vi.mock('node:child_process', () => ({
+  execFileSync: vi.fn(),
+}))
 
 let tempDir: string
 
 beforeEach(() => {
+  vi.mocked(execFileSync).mockReset()
   tempDir = mkdtempSync(join(tmpdir(), 'mdm-ext-test-'))
 })
 
@@ -26,6 +32,28 @@ describe('findEditorCli', () => {
   it('returns null when no candidates exist and editor is not on PATH', () => {
     const result = findEditorCli('nonexistent-editor-xyz-12345', ['/no/such/path'], 'darwin')
     expect(result).toBeNull()
+  })
+})
+
+describe('runInstallExtension', () => {
+  it('runs the editor CLI from the user home directory on macOS', () => {
+    runInstallExtension(
+      '/usr/local/bin/cursor',
+      'testuser',
+      '/Users/testuser',
+      '/Users/testuser/.cursor/extensions',
+      'darwin',
+    )
+
+    expect(execFileSync).toHaveBeenCalledWith(
+      'sudo',
+      ['-H', '-u', 'testuser', '/usr/local/bin/cursor', '--install-extension', 'glean.glean'],
+      {
+        cwd: '/Users/testuser',
+        stdio: 'pipe',
+        timeout: 120_000,
+      },
+    )
   })
 })
 

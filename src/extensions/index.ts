@@ -143,9 +143,10 @@ export function removeExtensionDirs(dirs: string[]): void {
   }
 }
 
-function runInstallExtension(
+export function runInstallExtension(
   cliPath: string,
   username: string,
+  userHomeDir: string,
   extensionsDir: string,
   platform: Platform,
 ): void {
@@ -156,6 +157,7 @@ function runInstallExtension(
     })
   } else {
     execFileSync('sudo', ['-H', '-u', username, cliPath, '--install-extension', EXTENSION_ID], {
+      cwd: userHomeDir,
       stdio: 'pipe',
       timeout: INSTALL_TIMEOUT_MS,
     })
@@ -187,7 +189,7 @@ export function installExtensions(options: InstallExtensionsOptions): ExtensionI
     try {
       const extensionsDir = join(userHomeDir, editor.extensionsDirName, 'extensions')
       const oldDirs = new Set(findOldExtensionDirs(extensionsDir))
-      runInstallExtension(cliPath, username, extensionsDir, platform)
+      runInstallExtension(cliPath, username, userHomeDir, extensionsDir, platform)
       const currentDirs = new Set(findOldExtensionDirs(extensionsDir))
       // Only clean old versions if the install actually added a new version dir.
       // If no new dirs appeared (no-op / already current), keep everything to
