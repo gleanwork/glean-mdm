@@ -54,6 +54,31 @@ describe('McpConfigSchema', () => {
 
     expect(result.success).toBe(true)
   })
+
+  it('preserves configured HTTP headers', () => {
+    const result = McpConfigSchema.safeParse({
+      serverName: 'glean_default',
+      url: 'https://example.com/mcp/default',
+      headers: {
+        'X-Glean-Metadata': 'mdm',
+        'X-Glean-MCP-Server-Name': 'extension-glean_default',
+      },
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data).toEqual([
+        {
+          serverName: 'glean_default',
+          url: 'https://example.com/mcp/default',
+          headers: {
+            'X-Glean-Metadata': 'mdm',
+            'X-Glean-MCP-Server-Name': 'extension-glean_default',
+          },
+        },
+      ])
+    }
+  })
 })
 
 describe('MdmConfigSchema', () => {

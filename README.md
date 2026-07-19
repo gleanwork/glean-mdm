@@ -78,7 +78,11 @@ Or specify custom paths with `--mcp-config` and `--mdm-config`.
 [
   {
     "serverName": "glean_default",
-    "url": "https://your-company-be.glean.com/mcp/default"
+    "url": "https://your-company-be.glean.com/mcp/default",
+    "headers": {
+      "X-Glean-Metadata": "mdm",
+      "X-Glean-MCP-Server-Name": "extension-glean_default"
+    }
   }
 ]
 ```

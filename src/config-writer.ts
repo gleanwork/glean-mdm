@@ -1,7 +1,14 @@
 import { mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { McpConfigSchema, type McpServerEntry, MdmConfigSchema } from './config.js'
+import {
+  gleanMcpServerNameHeaderName,
+  gleanMdmMetadataHeaderName,
+  gleanMdmMetadataHeaderValue,
+  McpConfigSchema,
+  type McpServerEntry,
+  MdmConfigSchema,
+} from './config.js'
 import { log } from './logger.js'
 import { getDefaultConfigDir } from './platform.js'
 
@@ -41,7 +48,14 @@ export function writeConfig(options: WriteConfigOptions): void {
   const outputDir = options.outputDir ?? getDefaultConfigDir()
   mkdirSync(outputDir, { recursive: true })
 
-  const newEntry = { serverName: options.serverName, url: options.serverUrl }
+  const newEntry = {
+    headers: {
+      [gleanMdmMetadataHeaderName]: gleanMdmMetadataHeaderValue,
+      [gleanMcpServerNameHeaderName]: `extension-${options.serverName}`,
+    },
+    serverName: options.serverName,
+    url: options.serverUrl,
+  }
   McpConfigSchema.parse([newEntry])
 
   const mdmData: Record<string, unknown> = {
