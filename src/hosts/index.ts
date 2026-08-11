@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { chownSync, lstatSync, mkdirSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { chownSync, mkdirSync } from 'node:fs'
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 
 import { createGleanRegistry } from '@gleanwork/mcp-config-glean'
 
@@ -11,7 +11,7 @@ import { getPlatform } from '../platform.js'
 
 import { configureJsonFile } from './json-configurator.js'
 import { configureTomlFile } from './toml-configurator.js'
-import { isPlainObject } from './utils.js'
+import { isPlainObject, resolveWritePath } from './utils.js'
 import { configureYamlFile } from './yaml-configurator.js'
 
 export interface ConfigureHostsOptions {
@@ -47,6 +47,24 @@ function chownAncestors(filePath: string, stopAt: string, uid: number, gid: numb
     }
     dir = dirname(dir)
   }
+}
+
+/**
+ * Resolve the file replaced by the configurator, including a symlink target.
+ * Only return targets inside the user's home so a per-user config symlink
+ * cannot make a root-run provisioner change ownership of a shared file.
+ */
+export function resolveUserOwnedWritePath(filePath: string, userHomeDir: string): string | null {
+  const writePath = resolveWritePath(filePath)
+  const resolvedHomeDir = resolveWritePath(userHomeDir)
+  const relativePath = relative(resolve(resolvedHomeDir), resolve(writePath))
+  const isWithinHome =
+    relativePath === '' ||
+    (relativePath !== '..' &&
+      !relativePath.startsWith(`..${sep}`) &&
+      !isAbsolute(relativePath))
+
+  return isWithinHome ? writePath : null
 }
 
 export function resolveProfileOwner(homeDir: string): string | null {
@@ -164,9 +182,10 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
           throw new Error(`Unsupported config format: ${client.configFormat}`)
       }
 
+      const ownedWritePath = resolveUserOwnedWritePath(resolvedPath, userHomeDir)
       if (currentPlatform === 'win32' && windowsOwner) {
-        if (!lstatSync(resolvedPath).isSymbolicLink()) {
-          windowsOwnerPaths.push(resolvedPath)
+        if (ownedWritePath) {
+          windowsOwnerPaths.push(ownedWritePath)
         }
         // Collect ancestor directories up to (but not including) the home dir
         const stopDir = resolve(userHomeDir)
@@ -176,8 +195,8 @@ export function configureHosts(options: ConfigureHostsOptions): ConfigureResult[
           dir = dirname(dir)
         }
       } else if (uid !== undefined && gid !== undefined) {
-        if (!lstatSync(resolvedPath).isSymbolicLink()) {
-          chownSync(resolvedPath, uid, gid)
+        if (ownedWritePath) {
+          chownSync(ownedWritePath, uid, gid)
         }
         chownAncestors(resolvedPath, userHomeDir, uid, gid)
       }
