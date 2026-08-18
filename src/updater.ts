@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 
 import { log } from './logger.js'
 import { getBinaryInstallPath, getPlatform, getTargetName } from './platform.js'
+import { getRunLockChildEnv } from './run-lock.js'
 import { BUILD_VERSION } from './version.js'
 
 interface VersionInfo {
@@ -146,6 +147,7 @@ export async function checkForUpdate(versionUrl: string, binaryUrlPrefix: string
 
     const filteredArgs = process.argv.slice(2).filter((a) => a !== '--skip-update')
     execFileSync(binaryPath, [...filteredArgs, '--skip-update'], {
+      env: getRunLockChildEnv(),
       stdio: 'inherit',
     })
     process.exit(0)

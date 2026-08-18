@@ -8,6 +8,7 @@ import {
   getDefaultMdmConfigPath,
   getLogFilePath,
   getPlatform,
+  getRunLockPath,
   getTargetName,
 } from './platform'
 
@@ -82,6 +83,12 @@ describe('getDefaultMdmConfigPath', () => {
 describe('getLogFilePath', () => {
   it('returns a path ending with the log filename', () => {
     expect(getLogFilePath()).toContain('glean-mdm.log')
+  })
+})
+
+describe('getRunLockPath', () => {
+  it('returns a path ending with the lock filename', () => {
+    expect(getRunLockPath()).toMatch(/glean-mdm\.run\.lock$/)
   })
 })
 

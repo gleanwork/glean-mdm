@@ -61,6 +61,12 @@ export function getLogFilePath(): string {
   return '/var/log/glean-mdm.log'
 }
 
+export function getRunLockPath(): string {
+  const p = getPlatform()
+  if (p === 'win32') return 'C:\\ProgramData\\Glean MDM\\glean-mdm.run.lock'
+  return '/tmp/glean-mdm.run.lock'
+}
+
 export function getBinaryInstallPath(): string {
   const p = getPlatform()
   if (p === 'win32') return 'C:\\Program Files\\Glean\\glean-mdm.exe'

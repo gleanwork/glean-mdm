@@ -6,6 +6,7 @@ import { writeConfig } from './config-writer.js'
 import { installExtensions } from './extensions/index.js'
 import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
+import { withRunLock } from './run-lock.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
 import { fullUninstall } from './uninstaller.js'
 import { checkForUpdate } from './updater.js'
@@ -75,7 +76,8 @@ async function executeRun(options: CliOptions): Promise<void> {
     const user = lookupUser(options.singleUser)
     if (!user) {
       log.error(`User not found: ${options.singleUser}`)
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
     users = [user]
   } else {
@@ -141,7 +143,7 @@ async function executeRun(options: CliOptions): Promise<void> {
   log.info(`Extensions: ${extensionSuccess} installed, ${extensionFailure} failed`)
 
   if (totalFailure > 0 || extensionFailure > 0) {
-    process.exit(1)
+    process.exitCode = 1
   }
 }
 
@@ -200,7 +202,7 @@ function setupProgram(): Command {
     .action(async (cmdOptions, command) => {
       const globalOpts = command.parent?.opts() || {}
       const options = buildCliOptions('run', globalOpts)
-      await executeRun(options)
+      await withRunLock(() => executeRun(options))
     })
 
   // install-schedule command
