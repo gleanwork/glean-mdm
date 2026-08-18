@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto'
-import { closeSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { closeSync, linkSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 import { log } from './logger.js'
@@ -21,11 +21,21 @@ export interface RunLock {
   release: () => void
 }
 
+interface LockIdentity {
+  device: number
+  inode: number
+  modifiedAtMs: number
+  size: number
+}
+
 type ExistingLock =
   | { kind: 'active-unknown' }
   | { kind: 'missing' }
-  | { kind: 'owner'; owner: RunLockOwner }
-  | { kind: 'stale-unknown' }
+  | { identity: LockIdentity; kind: 'owner'; owner: RunLockOwner }
+  | { identity: LockIdentity; kind: 'stale-unknown' }
+
+type StaleLock = Extract<ExistingLock, { kind: 'owner' | 'stale-unknown' }>
+type ReclaimResult = 'busy' | 'reclaimed' | 'retry'
 
 let currentRunLockToken: string | undefined
 
@@ -56,15 +66,25 @@ function inspectExistingLock(lockPath: string): ExistingLock {
   }
 
   try {
-    const owner: unknown = JSON.parse(raw)
-    if (isRunLockOwner(owner)) return { kind: 'owner', owner }
-  } catch {
-    // A process can observe the file between its exclusive creation and metadata write.
-  }
+    const stats = statSync(lockPath)
+    const identity = {
+      device: stats.dev,
+      inode: stats.ino,
+      modifiedAtMs: stats.mtimeMs,
+      size: stats.size,
+    }
 
-  try {
-    const ageMs = Date.now() - statSync(lockPath).mtimeMs
-    return ageMs > INCOMPLETE_LOCK_GRACE_MS ? { kind: 'stale-unknown' } : { kind: 'active-unknown' }
+    try {
+      const owner: unknown = JSON.parse(raw)
+      if (isRunLockOwner(owner)) return { identity, kind: 'owner', owner }
+    } catch {
+      // A process can observe the file between its exclusive creation and metadata write.
+    }
+
+    const ageMs = Date.now() - stats.mtimeMs
+    return ageMs > INCOMPLETE_LOCK_GRACE_MS
+      ? { identity, kind: 'stale-unknown' }
+      : { kind: 'active-unknown' }
   } catch (error) {
     if (getErrorCode(error) === 'ENOENT') return { kind: 'missing' }
     return { kind: 'active-unknown' }
@@ -77,6 +97,65 @@ function isProcessRunning(pid: number): boolean {
     return true
   } catch (error) {
     return getErrorCode(error) === 'EPERM'
+  }
+}
+
+function isSameLock(left: StaleLock, right: ExistingLock): boolean {
+  if (left.kind !== right.kind || (right.kind !== 'owner' && right.kind !== 'stale-unknown')) return false
+  if (
+    left.identity.device !== right.identity.device ||
+    left.identity.inode !== right.identity.inode ||
+    left.identity.modifiedAtMs !== right.identity.modifiedAtMs ||
+    left.identity.size !== right.identity.size
+  ) {
+    return false
+  }
+  if (left.kind === 'stale-unknown') return right.kind === 'stale-unknown'
+  return right.kind === 'owner' && left.owner.token === right.owner.token
+}
+
+function getReclaimPath(lockPath: string, lock: StaleLock): string {
+  const snapshot =
+    lock.kind === 'owner'
+      ? `${lock.identity.device}:${lock.identity.inode}:${lock.identity.modifiedAtMs}:${lock.identity.size}:${lock.owner.token}`
+      : `${lock.identity.device}:${lock.identity.inode}:${lock.identity.modifiedAtMs}:${lock.identity.size}`
+  const digest = createHash('sha256').update(snapshot).digest('hex')
+  return `${lockPath}.reclaim-${digest}`
+}
+
+function tryReclaimStaleLock(lockPath: string, observed: StaleLock): ReclaimResult {
+  const reclaimPath = getReclaimPath(lockPath, observed)
+  try {
+    // This hard link atomically captures the inode currently at lockPath. A
+    // contender may only unlink the canonical path while it owns this claim.
+    linkSync(lockPath, reclaimPath)
+  } catch (error) {
+    const code = getErrorCode(error)
+    if (code === 'ENOENT') return 'retry'
+    if (code !== 'EEXIST') log.warn(`Could not claim stale run lock ${lockPath}: ${error}`)
+    return 'busy'
+  }
+
+  try {
+    const claimed = inspectExistingLock(reclaimPath)
+    // A late contender may have linked a replacement lock under the old claim
+    // name. Only the exact stale inode observed above may be removed.
+    if (!isSameLock(observed, claimed)) return 'busy'
+
+    try {
+      unlinkSync(lockPath)
+      return 'reclaimed'
+    } catch (error) {
+      if (getErrorCode(error) === 'ENOENT') return 'retry'
+      log.warn(`Could not remove stale run lock ${lockPath}: ${error}`)
+      return 'busy'
+    }
+  } finally {
+    try {
+      unlinkSync(reclaimPath)
+    } catch {
+      // Best effort cleanup. A leftover claim makes future contenders no-op.
+    }
   }
 }
 
@@ -170,14 +249,14 @@ export function tryAcquireRunLock(lockPath = getRunLockPath()): RunLock | null {
       return null
     }
 
-    log.warn(`Removing stale run lock ${lockPath}`)
-    try {
-      unlinkSync(lockPath)
-    } catch (error) {
-      if (getErrorCode(error) === 'ENOENT') continue
+    const reclaimResult = tryReclaimStaleLock(lockPath, existing)
+    if (reclaimResult === 'retry') continue
+    if (reclaimResult === 'busy') {
       log.info('Another glean-mdm run is already in progress; skipping')
       return null
     }
+
+    log.warn(`Removed stale run lock ${lockPath}`)
   }
 
   log.info('Another glean-mdm run is already in progress; skipping')

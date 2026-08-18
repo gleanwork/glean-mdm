@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -33,6 +34,37 @@ function acquire(): RunLock {
   expect(lock).not.toBeNull()
   locks.push(lock!)
   return lock!
+}
+
+function countLines(path: string): number {
+  try {
+    return readFileSync(path, 'utf8').split('\n').filter(Boolean).length
+  } catch {
+    return 0
+  }
+}
+
+async function waitForLineCount(path: string, count: number): Promise<void> {
+  const deadline = Date.now() + 10_000
+  while (countLines(path) < count) {
+    if (Date.now() >= deadline) throw new Error(`Timed out waiting for ${count} contenders`)
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+function runContender(scriptPath: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('bun', [scriptPath, ...args], { stdio: ['ignore', 'ignore', 'pipe'] })
+    let stderr = ''
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk
+    })
+    child.on('error', reject)
+    child.on('exit', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`Contender exited with code ${code}: ${stderr}`))
+    })
+  })
 }
 
 describe('withRunLock', () => {
@@ -85,6 +117,58 @@ describe('tryAcquireRunLock', () => {
 
     expect(lock.owner.token).not.toBe('stale-token')
   })
+
+  it(
+    'allows only one concurrent contender to replace a stale lock',
+    async () => {
+      const contenderCount = 24
+      const scriptPath = join(tempDir, 'contender.ts')
+      const barrierPath = join(tempDir, 'start')
+      const readyPath = join(tempDir, 'ready')
+      const winnersPath = join(tempDir, 'winners')
+      const runLockUrl = new URL('./run-lock.ts', import.meta.url).href
+
+      writeFileSync(
+        scriptPath,
+        `import { appendFileSync, existsSync } from 'node:fs'
+const { withRunLock } = await import(${JSON.stringify(runLockUrl)})
+const [lockPath, barrierPath, readyPath, winnersPath] = process.argv.slice(2)
+appendFileSync(readyPath, process.pid + '\\n')
+while (!existsSync(barrierPath)) await Bun.sleep(1)
+await withRunLock(async () => {
+  appendFileSync(winnersPath, process.pid + '\\n')
+  await Bun.sleep(1_000)
+}, lockPath)
+`,
+      )
+      writeFileSync(
+        lockPath,
+        JSON.stringify({
+          createdAt: '2020-01-01T00:00:00.000Z',
+          pid: 2_000_000_000,
+          token: 'stale-token',
+        }),
+      )
+
+      const contenders = Array.from({ length: contenderCount }, () =>
+        runContender(scriptPath, [lockPath, barrierPath, readyPath, winnersPath]),
+      )
+
+      let readinessError: unknown
+      try {
+        await waitForLineCount(readyPath, contenderCount)
+      } catch (error) {
+        readinessError = error
+      } finally {
+        writeFileSync(barrierPath, '')
+      }
+      await Promise.all(contenders)
+      if (readinessError) throw readinessError
+
+      expect(countLines(winnersPath)).toBe(1)
+    },
+    30_000,
+  )
 
   it('does not remove an incomplete lock that was just created', () => {
     writeFileSync(lockPath, '')
