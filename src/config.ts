@@ -7,7 +7,10 @@ import { getDefaultMcpConfigPath, getDefaultMdmConfigPath } from './platform.js'
 const SEMVER_PATTERN = /^v?\d+\.\d+\.\d+$/
 
 const McpServerEntrySchema = z.object({
-  serverName: z.string().min(1),
+  serverName: z
+    .string()
+    .min(1)
+    .transform((name) => name.replace(/-/g, '_')),
   url: z.string().min(1),
 })
 
