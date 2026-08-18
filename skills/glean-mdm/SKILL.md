@@ -39,7 +39,7 @@ The normal admin workflow is **config → install-schedule → run**:
   - `mcp-config.json` — the MCP server(s) to provision (`serverName`, `url`).
   - `mdm-config.json` — the binary's own update behavior (`autoUpdate`, `versionUrl`, `binaryUrlPrefix`, `pinnedVersion`).
 - **`install-schedule`** registers the system runner (launchd / systemd / Task Scheduler); `uninstall-schedule` removes it; `uninstall` removes everything (schedule, config, logs, binary).
-- **`run`** does the per-user work: for each local user it installs the Glean editor extension, configures the MCP server entry in each supported host tool, then checks for a self-update. Run it as root/admin so it can enumerate all users and write their configs.
+- **`run`** checks for a self-update, then does the per-user work: for each local user it installs the Glean editor extension and configures the MCP server entry in each supported host tool. Run it as root/admin so it can enumerate all users and write their configs. Runs are serialized with a machine-wide lock; an overlapping invocation logs that it is skipping and exits successfully without making changes.
 - **Always dry-run first:** `glean-mdm run --dry-run [--user <name>]` previews changes; scope to one user with `--user`. Point at explicit configs with `--mcp-config` / `--mdm-config`.
 - **Self-update** runs before the work unless suppressed; logs go to the platform log file (e.g. `/var/log/glean-mdm.log`), rotated at 10 MB.
 

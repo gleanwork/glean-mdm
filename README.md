@@ -11,6 +11,8 @@ A CLI tool for IT/MDM administrators to automatically configure MCP (Model Conte
 3. **Configures each supported host application** by merging the Glean MCP server entry into each tool's config file (JSON, TOML, or YAML), preserving any existing settings
 4. **Self-updates** by checking the backend for newer versions before each run
 
+`glean-mdm run` is serialized with a machine-wide lock. If a scheduled or manual run starts while another run is active, the later invocation logs that it is skipping and exits successfully without making changes.
+
 ### Supported hosts
 
 Configuration is driven by [`@gleanwork/mcp-config-glean`](https://www.npmjs.com/package/@gleanwork/mcp-config-glean), which maintains the registry of supported clients and their config file paths. This includes tools like Claude Code, Cursor, VS Code, Windsurf, Goose, Codex, and others.

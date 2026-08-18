@@ -36,6 +36,16 @@ All paths are defined in `src/platform.ts`.
 | Linux | `/usr/local/bin/glean-mdm` |
 | Windows | `C:\Program Files\Glean\glean-mdm.exe` |
 
+### Run lock
+
+| Platform | Path |
+|----------|------|
+| macOS | `/tmp/glean-mdm.run.lock` |
+| Linux | `/tmp/glean-mdm.run.lock` |
+| Windows | `C:\ProgramData\Glean MDM\glean-mdm.run.lock` |
+
+Only one `glean-mdm run` process performs work at a time. An overlapping invocation exits successfully without doing work; locks left by terminated processes are reclaimed automatically.
+
 ## Verifying the schedule
 
 After running `glean-mdm install-schedule`, use the following commands to verify the schedule is set up correctly.
