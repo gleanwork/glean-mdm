@@ -66,11 +66,6 @@ function getDarwinUsers(): UserInfo[] {
       if (!homeMatch) continue
       const homeDir = homeMatch[1].trim()
 
-      if (!hasUsableHomeDir(homeDir)) {
-        log.info(`Skipping ${username} (home directory is not usable: ${homeDir})`)
-        continue
-      }
-
       const gidOutput = execSync(`dscl . -read /Users/${username} PrimaryGroupID`, { encoding: 'utf-8' })
       const gidMatch = gidOutput.match(PRIMARY_GROUP_ID)
       const gid = gidMatch ? parseInt(gidMatch[1], 10) : uid
@@ -127,7 +122,22 @@ function getWindowsUsers(): UserInfo[] {
   return users
 }
 
-export function enumerateUsers(): UserInfo[] {
+/**
+ * Drops users we cannot write config for, so every caller of `enumerateUsers`
+ * gets the same guarantee. Applied centrally rather than per platform: a
+ * placeholder home is not macOS-specific, and doing it in one place means a
+ * platform enumerator cannot forget it.
+ */
+export function withUsableHomeDirs(users: UserInfo[]): UserInfo[] {
+  return users.filter((user) => {
+    if (hasUsableHomeDir(user.homeDir)) return true
+
+    log.info(`Skipping ${user.username} (home directory is not usable: ${user.homeDir})`)
+    return false
+  })
+}
+
+function platformUsers(): UserInfo[] {
   switch (getPlatform()) {
     case 'darwin':
       return getDarwinUsers()
@@ -136,6 +146,10 @@ export function enumerateUsers(): UserInfo[] {
     case 'win32':
       return getWindowsUsers()
   }
+}
+
+export function enumerateUsers(): UserInfo[] {
+  return withUsableHomeDirs(platformUsers())
 }
 
 export function lookupUser(username: string): UserInfo | undefined {
