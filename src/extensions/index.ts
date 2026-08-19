@@ -152,13 +152,17 @@ export function runInstallExtension(
 ): void {
   if (platform === 'win32') {
     execFileSync(cliPath, ['--install-extension', EXTENSION_ID, '--extensions-dir', extensionsDir], {
-      stdio: 'pipe',
+      killSignal: 'SIGKILL',
+      stdio: 'ignore',
       timeout: INSTALL_TIMEOUT_MS,
     })
   } else {
-    execFileSync('sudo', ['-H', '-u', username, cliPath, '--install-extension', EXTENSION_ID], {
+    // `-n` so sudo fails instead of blocking on a password prompt: this runs
+    // from a root daemon with no TTY, so a prompt would never be answered.
+    execFileSync('sudo', ['-n', '-H', '-u', username, cliPath, '--install-extension', EXTENSION_ID], {
       cwd: userHomeDir,
-      stdio: 'pipe',
+      killSignal: 'SIGKILL',
+      stdio: 'ignore',
       timeout: INSTALL_TIMEOUT_MS,
     })
   }

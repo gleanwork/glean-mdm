@@ -142,7 +142,9 @@ async function executeRun(options: CliOptions): Promise<void> {
 
   log.info(`Extensions: ${extensionSuccess} installed, ${extensionFailure} failed`)
 
-  if (totalFailure > 0 || extensionFailure > 0) {
+  // Extension installs are best-effort — a missing editor CLI is already
+  // recorded as a skip — so only host configuration failures fail the run.
+  if (totalFailure > 0) {
     process.exitCode = 1
   }
 }
