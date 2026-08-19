@@ -16,14 +16,27 @@ export interface UserInfo {
   username: string
 }
 
+// Placeholder homes macOS and third-party installers give service accounts.
+// `/dev/null` is already rejected for not being a directory, but `/var/empty` is
+// a real root-owned directory, so it has to be named explicitly. Both the `/var`
+// and `/private/var` spellings are listed because `/var` is a symlink to
+// `/private/var` on macOS and either form can come back from `dscl`.
+const PLACEHOLDER_HOME_DIRS = new Set(['/dev/null', '/nonexistent', '/private/var/empty', '/var/empty'])
+
 /**
- * macOS assigns service accounts a placeholder home directory such as
- * `/dev/null` or `/var/empty`. Those are not directories we can write MCP
- * config into, so every host write for such a user fails and gets counted as a
- * real failure.
+ * A home directory we can safely write per-user MCP config into.
+ *
+ * Service accounts get a placeholder home instead of a real one. Writing there
+ * either fails for every host and gets counted as a real failure, or — because
+ * this runs as root and root ignores directory permissions — silently succeeds
+ * and litters a shared system directory that several service accounts share.
+ *
+ * This deliberately does not reject by `/var` prefix: `/private/var/<user>` is a
+ * legitimate home for admin accounts created by some MDM tools.
  */
 export function hasUsableHomeDir(homeDir: string): boolean {
   if (!homeDir) return false
+  if (PLACEHOLDER_HOME_DIRS.has(homeDir)) return false
 
   try {
     return statSync(homeDir).isDirectory()

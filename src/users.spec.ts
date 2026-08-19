@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -19,6 +19,22 @@ describe('hasUsableHomeDir', () => {
 
   it('rejects /dev/null, the placeholder home macOS gives service accounts', () => {
     expect(hasUsableHomeDir('/dev/null')).toBe(false)
+  })
+
+  it('rejects /var/empty even though it is a real directory', () => {
+    expect(hasUsableHomeDir('/var/empty')).toBe(false)
+    expect(hasUsableHomeDir('/private/var/empty')).toBe(false)
+  })
+
+  it('rejects /nonexistent', () => {
+    expect(hasUsableHomeDir('/nonexistent')).toBe(false)
+  })
+
+  it('accepts a real home under /private/var, which some MDM admin accounts use', () => {
+    const adminHome = join(tempDir, 'private', 'var', 'phd-itadmin')
+    mkdirSync(adminHome, { recursive: true })
+
+    expect(hasUsableHomeDir(adminHome)).toBe(true)
   })
 
   it('rejects a path that does not exist', () => {
