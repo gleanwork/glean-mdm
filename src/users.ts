@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { readdirSync } from 'node:fs'
+import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { log } from './logger.js'
@@ -16,6 +16,22 @@ export interface UserInfo {
   username: string
 }
 
+/**
+ * macOS assigns service accounts a placeholder home directory such as
+ * `/dev/null` or `/var/empty`. Those are not directories we can write MCP
+ * config into, so every host write for such a user fails and gets counted as a
+ * real failure.
+ */
+export function hasUsableHomeDir(homeDir: string): boolean {
+  if (!homeDir) return false
+
+  try {
+    return statSync(homeDir).isDirectory()
+  } catch {
+    return false
+  }
+}
+
 function getDarwinUsers(): UserInfo[] {
   const output = execSync('dscl . -list /Users UniqueID', {
     encoding: 'utf-8',
@@ -27,13 +43,20 @@ function getDarwinUsers(): UserInfo[] {
     if (parts.length < 2) continue
     const username = parts[0]
     const uid = parseInt(parts[1], 10)
-    if (uid < 500) continue
+    // A non-numeric UniqueID parses to NaN, and `NaN < 500` is false, so it
+    // would otherwise slip past the system-account filter.
+    if (!Number.isInteger(uid) || uid < 500) continue
 
     try {
       const homeOutput = execSync(`dscl . -read /Users/${username} NFSHomeDirectory`, { encoding: 'utf-8' })
       const homeMatch = homeOutput.match(NFS_HOME_DIR)
       if (!homeMatch) continue
       const homeDir = homeMatch[1].trim()
+
+      if (!hasUsableHomeDir(homeDir)) {
+        log.info(`Skipping ${username} (home directory is not usable: ${homeDir})`)
+        continue
+      }
 
       const gidOutput = execSync(`dscl . -read /Users/${username} PrimaryGroupID`, { encoding: 'utf-8' })
       const gidMatch = gidOutput.match(PRIMARY_GROUP_ID)

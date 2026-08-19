@@ -47,10 +47,11 @@ describe('runInstallExtension', () => {
 
     expect(execFileSync).toHaveBeenCalledWith(
       'sudo',
-      ['-H', '-u', 'testuser', '/usr/local/bin/cursor', '--install-extension', 'glean.glean'],
+      ['-n', '-H', '-u', 'testuser', '/usr/local/bin/cursor', '--install-extension', 'glean.glean'],
       {
         cwd: '/Users/testuser',
-        stdio: 'pipe',
+        killSignal: 'SIGKILL',
+        stdio: 'ignore',
         timeout: 120_000,
       },
     )
