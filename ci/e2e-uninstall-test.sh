@@ -2,6 +2,8 @@
 set -euo pipefail
 
 BINARY="${1:?Usage: e2e-uninstall-test.sh <binary>}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/legacy-schedule-fixture.sh"
 
 RUN_OUTPUT="$(mktemp)"
 
@@ -49,7 +51,7 @@ cleanup() {
   # Remove any leftover artifacts in case a test failed partway through
   case "$SCHEDULE_TYPE" in
     launchdaemon)
-      sudo launchctl bootout system "${PLIST_FILE}" 2>/dev/null || true
+      sudo launchctl bootout system/com.glean.mdm 2>/dev/null || true
       sudo rm -f "${PLIST_FILE}"
       ;;
     systemd)
@@ -105,8 +107,9 @@ echo '{}' | $SUDO tee "$CONFIG_DIR/mdm-config.json" > /dev/null
 # Write something to the log file so it exists
 echo "test log" | $SUDO tee "$LOG_FILE" > /dev/null
 
-# Install the schedule so uninstall has something to remove
-$SUDO "$INSTALL_PATH" install-schedule > /dev/null 2>&1
+# The retirement binary cannot create a schedule. Seed a legacy fixture.
+create_legacy_schedule
+assert_schedule_present
 
 # ---------------------------------------------------------------------------
 # Test 1: uninstall removes schedule, config, log, and binary
@@ -204,7 +207,8 @@ $SUDO mkdir -p "$CONFIG_DIR"
 echo '{}' | $SUDO tee "$CONFIG_DIR/mcp-config.json" > /dev/null
 echo '{}' | $SUDO tee "$CONFIG_DIR/mdm-config.json" > /dev/null
 echo "test log" | $SUDO tee "$LOG_FILE" > /dev/null
-$SUDO "$INSTALL_PATH" install-schedule > /dev/null 2>&1
+create_legacy_schedule
+assert_schedule_present
 
 $SUDO "$INSTALL_PATH" uninstall --keep-config > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?

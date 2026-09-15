@@ -1,183 +1,88 @@
-import { execFileSync, execSync } from 'node:child_process'
-import { existsSync, unlinkSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, unlinkSync } from 'node:fs'
 
 import { log } from './logger.js'
-import { getBinaryInstallPath, getPlatform } from './platform.js'
+import { getPlatform } from './platform.js'
 
 const MACOS_PLIST_PATH = '/Library/LaunchDaemons/com.glean.mdm.plist'
+const MACOS_SERVICE_TARGET = 'system/com.glean.mdm'
 const LINUX_SERVICE_PATH = '/etc/systemd/system/glean-mdm.service'
 const LINUX_TIMER_PATH = '/etc/systemd/system/glean-mdm.timer'
 const WINDOWS_TASK_NAME = 'Glean MDM'
 
-/** Random minute (0–59) to stagger scheduled runs and avoid thundering-herd on the version endpoint. */
-export function randomMinute(): number {
-  return Math.floor(Math.random() * 60)
-}
-
-/** Exposed for tests. The /TR value must quote paths with spaces for Task Scheduler. */
-export function schtasksCreateArgs(binaryPath: string, minute: number): string[] {
-  const startTime = `09:${String(minute).padStart(2, '0')}`
-  return ['/Create', '/TN', WINDOWS_TASK_NAME, '/TR', `"${binaryPath}" run`, '/SC', 'DAILY', '/ST', startTime, '/RU', 'SYSTEM', '/F']
-}
-
-export function buildMacOSPlist(binaryPath: string, minute: number): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.glean.mdm</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>${binaryPath}</string>
-        <string>run</string>
-    </array>
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>9</integer>
-        <key>Minute</key>
-        <integer>${minute}</integer>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>`
-}
-
-function installMacOSSchedule(): void {
-  const binaryPath = getBinaryInstallPath()
-  const minute = randomMinute()
-  const plist = buildMacOSPlist(binaryPath, minute)
-
-  writeFileSync(MACOS_PLIST_PATH, plist)
+function removeScheduleFile(path: string): void {
   try {
-    execSync(`launchctl bootout system "${MACOS_PLIST_PATH}"`, { stdio: 'ignore' })
-  } catch {
-    // May not be loaded
+    unlinkSync(path)
+  } catch (error) {
+    // Absence is success. Permission and I/O errors must fail retirement.
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
-  execSync(`launchctl bootstrap system "${MACOS_PLIST_PATH}"`)
-  log.info(`Installed macOS LaunchDaemon schedule (daily at 9:${String(minute).padStart(2, '0')} AM)`)
 }
 
 function uninstallMacOSSchedule(): void {
-  const existed = existsSync(MACOS_PLIST_PATH)
+  // bootout can terminate this process and its updating parent when invoked
+  // from the LaunchDaemon. Remove its persistent definition BEFORE unloading.
+  removeScheduleFile(MACOS_PLIST_PATH)
+  log.info('macOS LaunchDaemon definition is absent; unloading the legacy job if loaded')
   try {
-    execSync(`launchctl bootout system "${MACOS_PLIST_PATH}"`, { stdio: 'ignore' })
-  } catch {
-    // May not be loaded
+    // Use the service target: the plist has already been deleted, and the job
+    // can still be loaded even if its plist was missing before this run.
+    execFileSync('launchctl', ['bootout', MACOS_SERVICE_TARGET], { stdio: 'pipe' })
+  } catch (error) {
+    // launchctl returns ESRCH (3) when the job is not loaded.
+    if ((error as { status?: number }).status !== 3) throw error
   }
-  try {
-    unlinkSync(MACOS_PLIST_PATH)
-  } catch {
-    // May not exist
-  }
-  if (existed) {
-    log.info('Removed macOS LaunchDaemon schedule')
-  }
-}
-
-function installLinuxSchedule(): void {
-  const binaryPath = getBinaryInstallPath()
-
-  const service = `[Unit]
-Description=Glean MDM
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=${binaryPath} run
-
-[Install]
-WantedBy=multi-user.target
-`
-
-  const minute = randomMinute()
-  const timer = `[Unit]
-Description=Daily Glean MDM
-
-[Timer]
-OnCalendar=*-*-* 09:${String(minute).padStart(2, '0')}:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-`
-
-  writeFileSync(LINUX_SERVICE_PATH, service)
-  writeFileSync(LINUX_TIMER_PATH, timer)
-  execSync('systemctl daemon-reload')
-  execSync('systemctl enable --now glean-mdm.timer')
-  log.info(`Installed systemd timer schedule (daily at 9:${String(minute).padStart(2, '0')} AM)`)
 }
 
 function uninstallLinuxSchedule(): void {
   const existed = existsSync(LINUX_SERVICE_PATH) || existsSync(LINUX_TIMER_PATH)
-  try {
-    execSync('systemctl disable --now glean-mdm.timer', {
-      stdio: 'ignore',
-    })
-  } catch {
-    // May not be enabled
-  }
-  try {
-    unlinkSync(LINUX_SERVICE_PATH)
-  } catch {
-    // May not exist
-  }
-  try {
-    unlinkSync(LINUX_TIMER_PATH)
-  } catch {
-    // May not exist
-  }
-  try {
-    execSync('systemctl daemon-reload', { stdio: 'ignore' })
-  } catch {
-    // Best effort
-  }
-  if (existed) {
-    log.info('Removed systemd timer schedule')
-  }
-}
+  const state = execFileSync('systemctl', ['show', 'glean-mdm.timer', '--property=LoadState,ActiveState'], {
+    encoding: 'utf8',
+    stdio: 'pipe',
+  }).trim().split('\n')
+  const missing = state.includes('LoadState=not-found')
+  const inactive = state.includes('ActiveState=inactive')
 
-function installWindowsSchedule(): void {
-  const binaryPath = getBinaryInstallPath()
-  const minute = randomMinute()
-  execFileSync('schtasks', schtasksCreateArgs(binaryPath, minute))
-  // Enable catch-up: run the task if a scheduled run was missed while the machine was off
-  execSync(
-    `powershell -Command "$t = Get-ScheduledTask '${WINDOWS_TASK_NAME}'; $t.Settings.StartWhenAvailable = $true; $t | Set-ScheduledTask"`,
-  )
-  log.info(`Installed Windows Task Scheduler schedule (daily at 9:${String(minute).padStart(2, '0')} AM)`)
+  if (!existed && missing && inactive) return
+
+  // Stop the timer, not the service that may currently be retiring itself.
+  // A timer can remain active after its unit file was removed and reloaded.
+  if (missing) {
+    if (!inactive) execFileSync('systemctl', ['stop', 'glean-mdm.timer'], { stdio: 'pipe' })
+  } else {
+    execFileSync('systemctl', ['disable', '--now', 'glean-mdm.timer'], { stdio: 'pipe' })
+  }
+  removeScheduleFile(LINUX_SERVICE_PATH)
+  removeScheduleFile(LINUX_TIMER_PATH)
+  execFileSync('systemctl', ['daemon-reload'], { stdio: 'pipe' })
+  log.info('Removed systemd timer schedule')
 }
 
 function uninstallWindowsSchedule(): void {
-  try {
-    execSync(`schtasks /Delete /TN "${WINDOWS_TASK_NAME}" /F`, {
-      stdio: 'ignore',
-    })
-    log.info('Removed Windows Task Scheduler schedule')
-  } catch (error: unknown) {
-    log.error(`Failed to uninstall Windows schedule: ${error}`)
-  }
+  // Query objects instead of parsing localized schtasks errors. An absent task
+  // is success, but query/deletion failures must produce a non-zero exit.
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    `$task = Get-ScheduledTask | Where-Object { $_.TaskPath -eq '\\' -and $_.TaskName -eq '${WINDOWS_TASK_NAME}' }`,
+    "if ($null -ne $task) { $task | Unregister-ScheduledTask -Confirm:$false; Write-Output 'removed' }",
+  ].join('; ')
+  const result = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+    encoding: 'utf8',
+    stdio: 'pipe',
+  })
+  if (result.trim() === 'removed') log.info('Removed Windows Task Scheduler schedule')
 }
 
 export function installSchedule(): void {
-  switch (getPlatform()) {
-    case 'darwin':
-      installMacOSSchedule()
-      break
-    case 'linux':
-      installLinuxSchedule()
-      break
-    case 'win32':
-      installWindowsSchedule()
-      break
-  }
+  log.warn('glean-mdm is deprecated. install-schedule is a no-op; use glean-helper for new MDM deployments.')
 }
 
-export function uninstallSchedule(): void {
+export function uninstallSchedule(options: { dryRun?: boolean } = {}): void {
+  if (options.dryRun) {
+    log.info('[DRY RUN] Would remove the legacy Glean MDM schedule if present; no schedule changes made')
+    return
+  }
+
   switch (getPlatform()) {
     case 'darwin':
       uninstallMacOSSchedule()

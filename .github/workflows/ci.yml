@@ -73,16 +73,17 @@ jobs:
         run: bun install
         working-directory: pr
 
-      - name: Download latest released binary
+      - name: Download pre-retirement binary
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           asset_target="${{ matrix.target }}"
           asset_target="${asset_target#bun-}"
           asset="glean-mdm-${asset_target}${{ matrix.ext }}"
-          echo "Downloading latest release asset: ${asset}"
+          echo "Downloading pre-retirement v1.0.6 asset: ${asset}"
 
-          gh release download \
+          # Do not use latest: the retirement release no longer self-updates.
+          gh release download v1.0.6 \
             --repo "$GITHUB_REPOSITORY" \
             --pattern "$asset" \
             --output "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}" \
@@ -104,7 +105,7 @@ jobs:
             "$GITHUB_WORKSPACE/glean-mdm-old${{ matrix.ext }}" \
             pr/dist/glean-mdm-new${{ matrix.ext }}
 
-  e2e-error-handling:
+  e2e-retirement-preview:
     strategy:
       fail-fast: false
       matrix:
@@ -135,7 +136,7 @@ jobs:
             --target=${{ matrix.target }} \
             --define "process.env.BUILD_VERSION=\"0.1.0\"" \
             --outfile dist/glean-mdm${{ matrix.ext }}
-      - name: Run E2E error handling test
+      - name: Verify retirement ignores missing and malformed legacy configs
         run: ci/e2e-error-test.sh dist/glean-mdm${{ matrix.ext }}
 
   e2e-config:

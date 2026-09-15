@@ -1,56 +1,50 @@
 ---
 name: glean-mdm
-description: Use the glean-mdm CLI to provision Glean's AI-coding-tool integration on managed devices (IT/MDM fleet tooling) — install the Glean editor extension and configure MCP servers across supported AI coding tools for every user on a machine, on a system schedule. Load when operating, scripting, or troubleshooting glean-mdm on a managed device.
+description: Retire the deprecated glean-mdm system schedule on managed devices. Use when operating or troubleshooting the schedule-only retirement release, or interpreting legacy deployment scripts. New provisioning uses glean-helper.
 ---
 
 # glean-mdm
 
-A system-level CLI for IT/MDM administrators that provisions Glean's AI-coding-tool integration across every user on a managed machine. On each run it installs the Glean editor extension into supported editors, merges the organization's Glean MCP server entry into each tool's config (preserving existing settings), and self-updates. It runs unattended via the OS scheduler (launchd / systemd / Task Scheduler).
+`glean-mdm` is deprecated in favor of `glean-helper`. This release only retires the legacy system schedule. It does not migrate configuration to helper, install helper, or delete itself.
 
 ## When to use
 
-Load this skill when operating, scripting, or troubleshooting `glean-mdm` on a managed device — generating its config files, installing/removing the system schedule, or running the per-user provisioner. This is **fleet** tooling, run by an admin (typically as root) to set up *all* users on a machine. It is broader than MCP setup: configuring MCP servers is one of its jobs, alongside installing the Glean editor extension. For a single developer configuring their own MCP clients interactively, that's `@gleanwork/configure-mcp-server`, not this.
+Load when retiring or troubleshooting an existing `glean-mdm` deployment. For new provisioning, use `glean-helper` and its documented API. Do not generate new provisioning instructions using `glean-mdm`.
 
-## Install & import
+## Distribution
 
-`glean-mdm` is distributed as a self-contained per-platform binary (built from this repo via `./build.sh` and shipped as GitHub release assets, deployed by your MDM). It is not an npm import. Invoke the command directly:
-
-```bash
-glean-mdm --help
-```
-
-The set of supported editors/tools and their config-file paths is not defined here — it comes from the [`@gleanwork/mcp-config-glean`](https://www.npmjs.com/package/@gleanwork/mcp-config-glean) registry (Claude Code, Cursor, VS Code, Windsurf, Goose, Codex, …).
+The CLI is a self-contained per-platform binary built with `./build.sh` and published as GitHub release assets. It is not an npm import. Older releases can download this retirement release through their configured version endpoint and binary feed. Pinned, update-disabled, offline, or custom-feed installations may require an admin deployment.
 
 ## Authoritative API
 
-The command surface is the source of truth, not any prose. Read it rather than guessing flags:
+Read the CLI definitions in `src/index.ts` and each command's `--help` rather than guessing flags. Legacy config schemas remain in `src/config.ts` for the compatibility `config` command.
 
-- `glean-mdm --help` and each subcommand's `--help` (`run`, `config`, `install-schedule`, `uninstall-schedule`, `uninstall`)
-- the commander definitions and the `CliOptions` interface in `src/index.ts`
-- the config-file schemas (`McpConfigSchema`, `MdmConfigSchema`) in `src/config.ts`, and the documented shapes in `README.md`
+## Retirement workflow
 
-Don't transcribe the flag or schema lists — they drift. Check `--help` and the Zod schemas for the exact options.
+1. Preview with `glean-mdm run --dry-run`. This does not change the schedule.
+2. Run `glean-mdm run` as root/admin or Windows SYSTEM to remove the legacy launchd, systemd, or Task Scheduler schedule if present.
+3. Deploy/configure helper and remove leftover files using a separate admin MDM script when ready.
 
-## Usage patterns
+`run` no longer reads configuration, checks for updates, enumerates users, configures MCP clients, or installs extensions. It leaves the binary, central config, client settings, logs, and installed editor extensions in place. Normal logging still occurs. Existing client settings remain usable, but recurring provisioning stops.
 
-The normal admin workflow is **config → install-schedule → run**:
+Runs remain serialized with a machine-wide lock, including when invoked by an older updating parent. Overlapping runs skip successfully. Schedule removal is idempotent; actual permission or scheduler failures return an error. On macOS, unloading the active LaunchDaemon can terminate the invocation, so the persistent plist must be removed before unloading.
 
-- **`config`** generates two files into the platform default directory (override with `--output-dir`):
-  - `mcp-config.json` — the MCP server(s) to provision (`serverName`, `url`).
-  - `mdm-config.json` — the binary's own update behavior (`autoUpdate`, `versionUrl`, `binaryUrlPrefix`, `pinnedVersion`).
-- **`install-schedule`** registers the system runner (launchd / systemd / Task Scheduler); `uninstall-schedule` removes it; `uninstall` removes everything (schedule, config, logs, binary).
-- **`run`** checks for a self-update, then does the per-user work: for each local user it installs the Glean editor extension and configures the MCP server entry in each supported host tool. Run it as root/admin so it can enumerate all users and write their configs. Runs are serialized with a machine-wide lock; an overlapping invocation logs that it is skipping and exits successfully without making changes.
-- **Always dry-run first:** `glean-mdm run --dry-run [--user <name>]` previews changes; scope to one user with `--user`. Point at explicit configs with `--mcp-config` / `--mdm-config`.
-- **Self-update** runs before the work unless suppressed; logs go to the platform log file (e.g. `/var/log/glean-mdm.log`), rotated at 10 MB.
+## Compatibility commands and flags
+
+- `install-schedule` is a deprecated no-op. It neither installs nor removes a schedule. An older deployment script must still invoke `run` to retire an existing schedule.
+- `uninstall-schedule` explicitly removes only the schedule and supports `--dry-run`.
+- `--user`, `--skip-update`, `--mcp-config`, and `--mdm-config` remain accepted by `run` but are ignored. Retirement is machine-wide even with `--user`. Missing or malformed legacy configs do not block retirement.
+- `config` still generates legacy config files for script compatibility. They do not configure helper or enable self-updates in this release.
+- `uninstall` remains an explicit full-uninstall command (schedule, binary, config, logs). It is NOT called by retirement. Windows binary removal is best-effort. Use `--keep-config` to preserve central config; do not assume the global dry-run flag protects this legacy full-uninstall command.
 
 ## Common mistakes
 
-- **Running `run` without admin/root** — it must enumerate all local users and write per-user configs and extensions; unprivileged runs fail or no-op.
-- **Treating it as MCP-only** — `run` also installs the Glean editor extension; it's a general provisioning agent, not just an MCP config writer.
-- **Confusing it with `configure-mcp-server`** — that's single-user interactive MCP setup; `glean-mdm` is unattended fleet provisioning across all users.
-- **`autoUpdate: true` without a `versionUrl`** — auto-update needs the version endpoint to check against.
-- **Skipping `--dry-run`** before a real run on a fleet machine, or **hand-editing tool config files** instead of letting `run` merge (it preserves existing settings).
+- Expecting retirement to install or configure helper automatically.
+- Removing the macOS job before deleting its plist: unloading can stop the running process before the persistent schedule is removed.
+- Treating `--skip-update` as an opt-out from retirement: old updaters pass it to the downloaded binary, which must still retire the schedule.
+- Assuming binary publication reaches every device. Keep legacy release assets available and update version feeds and customer MDM policies separately; older binaries can still recreate schedules.
+- Running legacy privileged E2E scripts on a developer machine. Schedule/uninstall tests modify system paths and must run only on disposable CI machines.
 
-## Version notes
+## Version and logs
 
-Check the running version with `glean-mdm --version`. Binaries self-update against the `mdm-config.json` `versionUrl` (set `pinnedVersion` to opt out) and are built per-platform via `./build.sh`, published as GitHub release assets on a version tag. Don't hardcode a version — read it from the binary.
+Check `glean-mdm --version`. This release never self-updates. Log paths and retained configuration paths are documented in `README.md` and `DEVELOPERS.md`.

@@ -3,6 +3,8 @@ set -euo pipefail
 
 OLD_BINARY="${1:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
 NEW_BINARY="${2:?Usage: e2e-update-test.sh <old-binary> <new-binary>}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/legacy-schedule-fixture.sh"
 
 PORT_FILE="$(mktemp)"
 BINARY_PORT_FILE="$(mktemp)"
@@ -16,17 +18,27 @@ case "$(uname -s)" in
     INSTALL_DIR="/usr/local/bin"
     INSTALL_PATH="$INSTALL_DIR/glean-mdm"
     LOG_FILE="/var/log/glean-mdm.log"
+    SCHEDULE_TYPE="systemd"
+    SERVICE_FILE="/etc/systemd/system/glean-mdm.service"
+    TIMER_FILE="/etc/systemd/system/glean-mdm.timer"
+    SUDO="sudo"
     ;;
   Darwin)
     INSTALL_DIR="/usr/local/bin"
     INSTALL_PATH="$INSTALL_DIR/glean-mdm"
     LOG_FILE="/var/log/glean-mdm.log"
+    SCHEDULE_TYPE="launchdaemon"
+    PLIST_FILE="/Library/LaunchDaemons/com.glean.mdm.plist"
+    SUDO="sudo"
     ;;
   MINGW*|MSYS*|CYGWIN*)
     INSTALL_DIR="/c/Program Files/Glean"
     INSTALL_PATH="$INSTALL_DIR/glean-mdm.exe"
     LOG_DIR="/c/ProgramData/Glean MDM"
     LOG_FILE="$LOG_DIR/glean-mdm.log"
+    SCHEDULE_TYPE="schtasks"
+    TASK_NAME="Glean MDM"
+    SUDO=""
     ;;
   *)
     echo "FAIL: Unsupported platform: $(uname -s)"
@@ -37,6 +49,18 @@ esac
 cleanup() {
   echo "=== Cleanup ==="
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null || true
+  case "$SCHEDULE_TYPE" in
+    launchdaemon)
+      sudo launchctl bootout system/com.glean.mdm 2>/dev/null || true
+      sudo rm -f "$PLIST_FILE"
+      ;;
+    systemd)
+      sudo systemctl disable --now glean-mdm.timer 2>/dev/null || true
+      sudo rm -f "$SERVICE_FILE" "$TIMER_FILE"
+      sudo systemctl daemon-reload 2>/dev/null || true
+      ;;
+    schtasks) schtasks //Delete //TN "$TASK_NAME" //F 2>/dev/null || true ;;
+  esac
   rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
   rm -rf "$CONFIG_DIR"
   rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
@@ -68,7 +92,6 @@ OLD_VER=$(tr -d '\r' < "$RUN_OUTPUT")
 echo "Old binary version: $OLD_VER"
 
 echo "=== Start mock server ==="
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 bun "$SCRIPT_DIR/e2e-mock-server.ts" \
   --binary-path "$NEW_BINARY" \
   --version 99.0.0 \
@@ -118,8 +141,14 @@ MDM_CONFIG_FILE="$CONFIG_DIR/mdm-config.json"
 echo "MCP config: $(cat "$MCP_CONFIG_FILE")"
 echo "MDM config: $(cat "$MDM_CONFIG_FILE")"
 
-echo "=== Run old binary (triggers update) ==="
-"$INSTALL_PATH" run --dry-run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
+echo "=== Seed a legacy schedule and preserve the configs ==="
+create_legacy_schedule
+assert_schedule_present
+cp "$MCP_CONFIG_FILE" "$CONFIG_DIR/mcp-before.json"
+cp "$MDM_CONFIG_FILE" "$CONFIG_DIR/mdm-before.json"
+
+echo "=== Run old binary (updates, then retires under the inherited lock) ==="
+$SUDO "$INSTALL_PATH" run --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
   EXIT_CODE=$?
   echo "FAIL: Binary exited with code $EXIT_CODE"
   echo "=== Output ==="
@@ -129,6 +158,15 @@ echo "=== Run old binary (triggers update) ==="
   exit 1
 }
 tr -d '\r' < "$RUN_OUTPUT"
+grep -q 'glean-mdm is deprecated' "$RUN_OUTPUT"
+if grep -Eq 'Configuring hosts|Installing extensions' "$RUN_OUTPUT"; then
+  echo "FAIL: Old updater fell back to legacy provisioning after retirement"
+  exit 1
+fi
+schedule_is_absent
+cmp "$MCP_CONFIG_FILE" "$CONFIG_DIR/mcp-before.json"
+cmp "$MDM_CONFIG_FILE" "$CONFIG_DIR/mdm-before.json"
+test -f "$LOG_FILE"
 
 echo "=== Verify update ==="
 "$INSTALL_PATH" --version > "$RUN_OUTPUT" 2>&1 || true
@@ -152,11 +190,14 @@ echo "=== Run new binary again (should not update) ==="
 RUN2_OUTPUT=$(tr -d '\r' < "$RUN_OUTPUT")
 echo "$RUN2_OUTPUT"
 
-if echo "$RUN2_OUTPUT" | grep -q "Already up to date"; then
-  echo "Confirmed: no update on second run"
-else
-  echo "FAIL: Expected 'Already up to date' in second run output"
+if ! grep -q 'glean-mdm is deprecated' "$RUN_OUTPUT" || ! grep -q '\[DRY RUN\]' "$RUN_OUTPUT"; then
+  echo "FAIL: Expected retirement preview on second run"
   exit 1
 fi
+if grep -Eq 'Checking for updates|Already up to date|Configuring hosts|Installing extensions' "$RUN_OUTPUT"; then
+  echo "FAIL: Retirement release attempted legacy work"
+  exit 1
+fi
+echo "Confirmed: new binary previews retirement without self-updating or provisioning"
 
 echo "PASS: E2E update test succeeded"
