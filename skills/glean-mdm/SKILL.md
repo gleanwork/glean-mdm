@@ -11,7 +11,7 @@ description: Retire the deprecated glean-mdm system schedule on managed devices.
 
 Load when retiring or troubleshooting an existing `glean-mdm` deployment. For new provisioning, use `glean-helper` and its documented API. Do not generate new provisioning instructions using `glean-mdm`.
 
-## Distribution
+## Install & import
 
 The CLI is a self-contained per-platform binary built with `./build.sh` and published as GitHub release assets. It is not an npm import. Older releases can download this retirement release through their configured version endpoint and binary feed. Pinned, update-disabled, offline, or custom-feed installations may require an admin deployment.
 
@@ -19,7 +19,7 @@ The CLI is a self-contained per-platform binary built with `./build.sh` and publ
 
 Read the CLI definitions in `src/index.ts` and each command's `--help` rather than guessing flags. Legacy config schemas remain in `src/config.ts` for the compatibility `config` command.
 
-## Retirement workflow
+## Usage patterns
 
 1. Preview with `glean-mdm run --dry-run`. This does not change the schedule.
 2. Run `glean-mdm run` as root/admin or Windows SYSTEM to remove the legacy launchd, systemd, or Task Scheduler schedule if present.
@@ -45,6 +45,6 @@ Runs remain serialized with a machine-wide lock, including when invoked by an ol
 - Assuming binary publication reaches every device. Keep legacy release assets available and update version feeds and customer MDM policies separately; older binaries can still recreate schedules.
 - Running legacy privileged E2E scripts on a developer machine. Schedule/uninstall tests modify system paths and must run only on disposable CI machines.
 
-## Version and logs
+## Version notes
 
 Check `glean-mdm --version`. This release never self-updates. Log paths and retained configuration paths are documented in `README.md` and `DEVELOPERS.md`.

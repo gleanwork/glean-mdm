@@ -2,367 +2,72 @@
 set -euo pipefail
 
 BINARY="${1:?Usage: e2e-config-test.sh <binary>}"
+WORK_DIR="$(mktemp -d)"
+CONFIG_DIR="$WORK_DIR/config with spaces"
+RUN_OUTPUT="$WORK_DIR/output.log"
+trap 'rm -rf "$WORK_DIR"' EXIT
 
-CONFIG_DIR="$(mktemp -d)"
-RUN_OUTPUT="$(mktemp)"
-CHECKSUMS_RUN1="$(mktemp)"
-CHECKSUMS_RUN2="$(mktemp)"
-
-# Platform-specific paths matching src/platform.ts
-case "$(uname -s)" in
-  Linux)
-    INSTALL_DIR="/usr/local/bin"
-    INSTALL_PATH="$INSTALL_DIR/glean-mdm"
-    LOG_FILE="/var/log/glean-mdm.log"
-    ;;
-  Darwin)
-    INSTALL_DIR="/usr/local/bin"
-    INSTALL_PATH="$INSTALL_DIR/glean-mdm"
-    LOG_FILE="/var/log/glean-mdm.log"
-    ;;
-  MINGW*|MSYS*|CYGWIN*)
-    INSTALL_DIR="/c/Program Files/Glean"
-    INSTALL_PATH="$INSTALL_DIR/glean-mdm.exe"
-    LOG_DIR="/c/ProgramData/Glean MDM"
-    LOG_FILE="$LOG_DIR/glean-mdm.log"
-    ;;
-  *)
-    echo "FAIL: Unsupported platform: $(uname -s)"
+# This release keeps the config command for script compatibility, but run no
+# longer provisions client configs. Test only config generation here; schedule
+# retirement and preservation are covered by e2e-schedule-test.sh.
+run_config() {
+  if ! "$BINARY" config \
+    --server-name "$1" \
+    --server-url "$2" \
+    --no-auto-update \
+    --binary-url-prefix https://example.invalid/static/mdm/binaries \
+    --output-dir "$CONFIG_DIR" > "$RUN_OUTPUT" 2>&1; then
+    cat "$RUN_OUTPUT"
+    echo "FAIL: config command failed"
     exit 1
-    ;;
-esac
-
-CREATED_FILES=()
-
-# Use sha256sum on Windows (Git Bash), shasum elsewhere
-if command -v shasum > /dev/null 2>&1; then
-  hash_cmd() { shasum -a 256 "$1"; }
-else
-  hash_cmd() { sha256sum "$1"; }
-fi
-
-cleanup() {
-  echo "=== Cleanup ==="
-  for f in "${CREATED_FILES[@]+"${CREATED_FILES[@]}"}"; do
-    rm -f "$f" 2>/dev/null || true
-    # Remove parent dirs if empty up to HOME
-    local dir
-    dir="$(dirname "$f")"
-    while [ "$dir" != "$HOME" ] && [ "$dir" != "/" ] && [ ${#dir} -gt ${#HOME} ]; do
-      rmdir "$dir" 2>/dev/null || break
-      dir="$(dirname "$dir")"
-    done
-  done
-
-  rm -rf "$CONFIG_DIR"
-  rm -f "$RUN_OUTPUT" "$CHECKSUMS_RUN1" "$CHECKSUMS_RUN2" "${UNIQUE_FILES_FILE:-}" "$INSTALL_PATH"
-  rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
-  case "$(uname -s)" in
-    Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
-    *) rm -f "$LOG_FILE" ;;
-  esac
+  fi
 }
-trap cleanup EXIT
-
-echo "=== Prepare environment ==="
-case "$(uname -s)" in
-  Linux|Darwin)
-    sudo chown "$(whoami)" "$INSTALL_DIR"
-    sudo touch "$LOG_FILE" && sudo chmod 666 "$LOG_FILE"
-    ;;
-  MINGW*|MSYS*|CYGWIN*)
-    mkdir -p "$INSTALL_DIR"
-    mkdir -p "$LOG_DIR"
-    touch "$LOG_FILE"
-    ;;
-esac
-
-echo "=== Install binary ==="
-cp "$BINARY" "$INSTALL_PATH"
-chmod 755 "$INSTALL_PATH"
-
-echo "=== Generate test configs via config subcommand ==="
-"$INSTALL_PATH" config \
-  --server-name e2e_config_test \
-  --server-url https://example.invalid/mcp/default \
-  --no-auto-update \
-  --binary-url-prefix https://example.invalid/static/mdm/binaries \
-  --output-dir "$CONFIG_DIR"
 
 MCP_CONFIG_FILE="$CONFIG_DIR/mcp-config.json"
 MDM_CONFIG_FILE="$CONFIG_DIR/mdm-config.json"
 
-echo "MCP config: $(cat "$MCP_CONFIG_FILE")"
-echo "MDM config: $(cat "$MDM_CONFIG_FILE")"
+echo "=== Generate legacy config files ==="
+run_config e2e_config_test https://example.invalid/mcp/default
+bun - "$MCP_CONFIG_FILE" "$MDM_CONFIG_FILE" <<'JS'
+const assert = require('node:assert/strict')
+const { readFileSync } = require('node:fs')
+const [mcpPath, mdmPath] = process.argv.slice(2)
+assert.deepEqual(JSON.parse(readFileSync(mcpPath, 'utf8')), [
+  { serverName: 'e2e_config_test', url: 'https://example.invalid/mcp/default' },
+])
+assert.deepEqual(JSON.parse(readFileSync(mdmPath, 'utf8')), {
+  autoUpdate: false,
+  binaryUrlPrefix: 'https://example.invalid/static/mdm/binaries',
+})
+JS
+cp "$MCP_CONFIG_FILE" "$WORK_DIR/mcp-original.json"
+cp "$MDM_CONFIG_FILE" "$WORK_DIR/mdm-original.json"
+echo "PASS [config-generation]: Both files contain the expected configuration"
 
-echo ""
-echo "=== Re-run config with same server-name (expect skip) ==="
-"$INSTALL_PATH" config \
-  --server-name e2e_config_test \
-  --server-url https://different.invalid/mcp/default \
-  --no-auto-update \
-  --binary-url-prefix https://example.invalid/static/mdm/binaries \
-  --output-dir "$CONFIG_DIR"
+echo "=== Existing server-name preserves the original URL ==="
+run_config e2e_config_test https://different.invalid/mcp/default
+cmp "$MCP_CONFIG_FILE" "$WORK_DIR/mcp-original.json"
+cmp "$MDM_CONFIG_FILE" "$WORK_DIR/mdm-original.json"
+echo "PASS [skip-preserves-original]: Existing configuration is unchanged"
 
-MCP_AFTER_SKIP="$(cat "$MCP_CONFIG_FILE")"
-echo "MCP config after skip: $MCP_AFTER_SKIP"
+echo "=== New server-name appends an entry ==="
+run_config e2e_second_server https://second.invalid/mcp/default
+bun - "$MCP_CONFIG_FILE" <<'JS'
+const assert = require('node:assert/strict')
+const { readFileSync } = require('node:fs')
+assert.deepEqual(JSON.parse(readFileSync(process.argv[2], 'utf8')), [
+  { serverName: 'e2e_config_test', url: 'https://example.invalid/mcp/default' },
+  { serverName: 'e2e_second_server', url: 'https://second.invalid/mcp/default' },
+])
+JS
+cmp "$MDM_CONFIG_FILE" "$WORK_DIR/mdm-original.json"
+cp "$MCP_CONFIG_FILE" "$WORK_DIR/mcp-appended.json"
+echo "PASS [append-new-server]: Both server entries are present"
 
-if echo "$MCP_AFTER_SKIP" | grep -q "example.invalid/mcp/default"; then
-  echo "PASS [skip-preserves-original]: Original server URL preserved"
-else
-  echo "FAIL [skip-preserves-original]: Original server URL was overwritten"
-  exit 1
-fi
+echo "=== Repeated generation is idempotent ==="
+run_config e2e_second_server https://second.invalid/mcp/default
+cmp "$MCP_CONFIG_FILE" "$WORK_DIR/mcp-appended.json"
+cmp "$MDM_CONFIG_FILE" "$WORK_DIR/mdm-original.json"
+echo "PASS [idempotency]: Both config files are byte-for-byte identical"
 
-echo ""
-echo "=== Run config with new server-name (expect append) ==="
-"$INSTALL_PATH" config \
-  --server-name e2e_second_server \
-  --server-url https://second.invalid/mcp/default \
-  --no-auto-update \
-  --binary-url-prefix https://example.invalid/static/mdm/binaries \
-  --output-dir "$CONFIG_DIR"
-
-MCP_AFTER_APPEND="$(cat "$MCP_CONFIG_FILE")"
-echo "MCP config after append: $MCP_AFTER_APPEND"
-
-ENTRY_COUNT=$(echo "$MCP_AFTER_APPEND" | grep -c '"serverName"')
-if [ "$ENTRY_COUNT" -eq 2 ]; then
-  echo "PASS [append-new-server]: Two server entries present"
-else
-  echo "FAIL [append-new-server]: Expected 2 entries, found $ENTRY_COUNT"
-  exit 1
-fi
-
-echo ""
-echo "=== Run 1: Create configs ==="
-"$INSTALL_PATH" run --skip-update --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" \
-  --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
-  EXIT_CODE=$?
-  echo "FAIL: Binary exited with code $EXIT_CODE"
-  echo "=== Output ==="
-  tr -d '\r' < "$RUN_OUTPUT"
-  echo "=== Log file ==="
-  cat "$LOG_FILE" 2>/dev/null || true
-  exit 1
-}
-tr -d '\r' < "$RUN_OUTPUT"
-
-echo ""
-echo "=== Discover created config files ==="
-while IFS= read -r line; do
-  CREATED_FILES+=("$line")
-done < <(tr -d '\r' < "$RUN_OUTPUT" | grep -E 'Configured (JSON|TOML|YAML): ' | sed 's/.*Configured [A-Z]*: //')
-
-echo "Found ${#CREATED_FILES[@]} configured file(s)"
-for f in "${CREATED_FILES[@]}"; do
-  echo "  $f"
-done
-
-if [ ${#CREATED_FILES[@]} -eq 0 ]; then
-  echo "FAIL [config-created]: No config files were created"
-  exit 1
-fi
-echo "PASS [config-created]: ${#CREATED_FILES[@]} config file(s) created"
-
-echo ""
-echo "=== Verify config files exist and have content ==="
-CONTENT_VERIFIED=false
-for f in "${CREATED_FILES[@]}"; do
-  if [ ! -f "$f" ]; then
-    echo "FAIL [file-exists]: File not found: $f"
-    exit 1
-  fi
-  if [ ! -s "$f" ]; then
-    echo "FAIL [file-nonempty]: File is empty: $f"
-    exit 1
-  fi
-  if grep -q "example.invalid" "$f" 2>/dev/null; then
-    CONTENT_VERIFIED=true
-  fi
-done
-echo "PASS [file-exists]: All config files exist and are non-empty"
-
-if [ "$CONTENT_VERIFIED" = true ]; then
-  echo "PASS [content-check]: At least one config file contains expected server URL"
-else
-  echo "FAIL [content-check]: No config file contains 'example.invalid'"
-  echo "=== File contents ==="
-  for f in "${CREATED_FILES[@]}"; do
-    echo "--- $f ---"
-    cat "$f"
-  done
-  exit 1
-fi
-
-echo ""
-echo "=== Verify config file ownership ==="
-EXPECTED_OWNER="$(whoami)"
-OWNERSHIP_OK=true
-CHECKED=0
-
-case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*)
-    WIN_HOME=$(cygpath -w "$HOME")
-    EXPECTED_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
-      "\$p = Get-CimInstance Win32_UserProfile | Where-Object { \$_.LocalPath -eq '${WIN_HOME}' } | Select-Object -First 1; ([System.Security.Principal.SecurityIdentifier]::new(\$p.SID)).Translate([System.Security.Principal.NTAccount]).Value" | tr -d '\r')
-    echo "Expected owner: $EXPECTED_OWNER"
-
-    # Deduplicate paths (some hosts share the same config file)
-    while IFS= read -r f; do
-      WIN_F=$(cygpath -w "$f")
-      ACTUAL_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
-        "(Get-Acl -LiteralPath '${WIN_F}').Owner" | tr -d '\r')
-      CHECKED=$((CHECKED + 1))
-      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
-        echo "  OK: $f"
-      else
-        echo "  FAIL: $f (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
-        OWNERSHIP_OK=false
-      fi
-    done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
-    ;;
-  Darwin)
-    echo "Expected owner: $EXPECTED_OWNER"
-    while IFS= read -r f; do
-      ACTUAL_OWNER=$(stat -f '%Su' "$f")
-      CHECKED=$((CHECKED + 1))
-      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
-        echo "  OK: $f"
-      else
-        echo "  FAIL: $f (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
-        OWNERSHIP_OK=false
-      fi
-    done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
-    ;;
-  Linux)
-    echo "Expected owner: $EXPECTED_OWNER"
-    while IFS= read -r f; do
-      ACTUAL_OWNER=$(stat -c '%U' "$f")
-      CHECKED=$((CHECKED + 1))
-      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
-        echo "  OK: $f"
-      else
-        echo "  FAIL: $f (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
-        OWNERSHIP_OK=false
-      fi
-    done < <(printf '%s\n' "${CREATED_FILES[@]}" | sort -u)
-    ;;
-esac
-
-if [ "$OWNERSHIP_OK" = true ]; then
-  echo "PASS [ownership]: All $CHECKED config file(s) owned by $EXPECTED_OWNER"
-else
-  echo "FAIL [ownership]: Some config files have incorrect ownership"
-  exit 1
-fi
-
-echo ""
-echo "=== Verify parent directory ownership ==="
-DIR_OWNERSHIP_OK=true
-DIR_CHECKED=0
-
-# Collect unique parent directories (up to but not including HOME)
-PARENT_DIRS_FILE="$(mktemp)"
-for f in "${CREATED_FILES[@]}"; do
-  dir="$(dirname "$f")"
-  while [ "$dir" != "$HOME" ] && [ "$dir" != "/" ] && [ ${#dir} -gt ${#HOME} ]; do
-    echo "$dir"
-    dir="$(dirname "$dir")"
-  done
-done | sort -u > "$PARENT_DIRS_FILE"
-
-case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*)
-    echo "Expected owner: $EXPECTED_OWNER"
-    while IFS= read -r d; do
-      WIN_D=$(cygpath -w "$d")
-      ACTUAL_OWNER=$(powershell.exe -NoProfile -NonInteractive -Command \
-        "(Get-Acl -LiteralPath '${WIN_D}').Owner" | tr -d '\r')
-      DIR_CHECKED=$((DIR_CHECKED + 1))
-      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
-        echo "  OK: $d"
-      else
-        echo "  FAIL: $d (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
-        DIR_OWNERSHIP_OK=false
-      fi
-    done < "$PARENT_DIRS_FILE"
-    ;;
-  Darwin)
-    echo "Expected owner: $EXPECTED_OWNER"
-    while IFS= read -r d; do
-      ACTUAL_OWNER=$(stat -f '%Su' "$d")
-      DIR_CHECKED=$((DIR_CHECKED + 1))
-      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
-        echo "  OK: $d"
-      else
-        echo "  FAIL: $d (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
-        DIR_OWNERSHIP_OK=false
-      fi
-    done < "$PARENT_DIRS_FILE"
-    ;;
-  Linux)
-    echo "Expected owner: $EXPECTED_OWNER"
-    while IFS= read -r d; do
-      ACTUAL_OWNER=$(stat -c '%U' "$d")
-      DIR_CHECKED=$((DIR_CHECKED + 1))
-      if [ "$ACTUAL_OWNER" = "$EXPECTED_OWNER" ]; then
-        echo "  OK: $d"
-      else
-        echo "  FAIL: $d (expected: $EXPECTED_OWNER, actual: $ACTUAL_OWNER)"
-        DIR_OWNERSHIP_OK=false
-      fi
-    done < "$PARENT_DIRS_FILE"
-    ;;
-esac
-
-rm -f "$PARENT_DIRS_FILE"
-
-if [ "$DIR_OWNERSHIP_OK" = true ]; then
-  echo "PASS [dir-ownership]: All $DIR_CHECKED parent dir(s) owned by $EXPECTED_OWNER"
-else
-  echo "FAIL [dir-ownership]: Some parent directories have incorrect ownership"
-  exit 1
-fi
-
-echo ""
-echo "=== Compute Run 1 checksums ==="
-# Deduplicate paths (e.g. cursor and cursor-agent share the same file)
-UNIQUE_FILES_FILE="$(mktemp)"
-printf '%s\n' "${CREATED_FILES[@]}" | sort -u > "$UNIQUE_FILES_FILE"
-
-while IFS= read -r f; do
-  hash_cmd "$f"
-done < "$UNIQUE_FILES_FILE" | sort > "$CHECKSUMS_RUN1"
-cat "$CHECKSUMS_RUN1"
-
-echo ""
-echo "=== Run 2: Verify idempotency ==="
-"$INSTALL_PATH" run --skip-update --mcp-config "$MCP_CONFIG_FILE" --mdm-config "$MDM_CONFIG_FILE" \
-  --user "$(whoami)" > "$RUN_OUTPUT" 2>&1 || {
-  EXIT_CODE=$?
-  echo "FAIL: Second run exited with code $EXIT_CODE"
-  echo "=== Output ==="
-  tr -d '\r' < "$RUN_OUTPUT"
-  exit 1
-}
-tr -d '\r' < "$RUN_OUTPUT"
-
-echo ""
-echo "=== Compute Run 2 checksums ==="
-while IFS= read -r f; do
-  hash_cmd "$f"
-done < "$UNIQUE_FILES_FILE" | sort > "$CHECKSUMS_RUN2"
-cat "$CHECKSUMS_RUN2"
-
-if diff -q "$CHECKSUMS_RUN1" "$CHECKSUMS_RUN2" > /dev/null 2>&1; then
-  echo "PASS [idempotency]: All config files are byte-for-byte identical after second run"
-else
-  echo "FAIL [idempotency]: Config files changed between runs"
-  echo "=== Diff ==="
-  diff "$CHECKSUMS_RUN1" "$CHECKSUMS_RUN2" || true
-  exit 1
-fi
-
-echo ""
-echo "PASS: All E2E config creation and idempotency tests succeeded"
+echo "PASS: Legacy config generation, preservation, append, and idempotency"

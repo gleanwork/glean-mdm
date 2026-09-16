@@ -63,7 +63,8 @@ cleanup() {
   esac
   rm -f "$PORT_FILE" "$BINARY_PORT_FILE" "$RUN_OUTPUT" "$INSTALL_PATH"
   rm -rf "$CONFIG_DIR"
-  rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
+  # The old updater runs as root/admin and leaves root-owned staging dirs.
+  $SUDO rm -rf "$INSTALL_DIR"/.glean-mdm-update-*
   case "$(uname -s)" in
     Linux|Darwin) sudo rm -f "$LOG_FILE" ;;
     *) rm -f "$LOG_FILE" ;;
