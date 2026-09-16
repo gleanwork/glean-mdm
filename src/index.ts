@@ -1,16 +1,11 @@
 import { Command } from 'commander'
 import { ZodError } from 'zod'
 
-import { getServerUrl, readMcpConfig, readMdmConfig } from './config.js'
 import { writeConfig } from './config-writer.js'
-import { installExtensions } from './extensions/index.js'
-import { configureHosts } from './hosts/index.js'
 import { initLogger, log } from './logger.js'
 import { withRunLock } from './run-lock.js'
 import { installSchedule, uninstallSchedule } from './scheduler.js'
 import { fullUninstall } from './uninstaller.js'
-import { checkForUpdate } from './updater.js'
-import { enumerateUsers, getActiveSessionUsers, lookupUser } from './users.js'
 import { BUILD_VERSION } from './version.js'
 
 export interface CliOptions {
@@ -58,95 +53,13 @@ export function buildCliOptions(
 }
 
 async function executeRun(options: CliOptions): Promise<void> {
-  const mcpConfig = readMcpConfig(options.mcpConfigPath)
-  const mdmConfig = readMdmConfig(options.mdmConfigPath)
+  log.warn('glean-mdm is deprecated. Use glean-helper for new MDM deployments.')
+  log.info('Retiring the legacy schedule only; keeping the binary, configuration, logs, and editor extensions.')
 
-  for (const server of mcpConfig.servers) {
-    log.info(`Server: ${server.serverName} (${getServerUrl(server)})`)
-  }
-
-  if (!options.skipUpdate && mdmConfig.autoUpdate) {
-    await checkForUpdate(mdmConfig.versionUrl!, mdmConfig.binaryUrlPrefix, mdmConfig.pinnedVersion)
-  } else if (!mdmConfig.autoUpdate) {
-    log.info('Auto-update disabled by configuration')
-  }
-
-  let users
-  if (options.singleUser) {
-    const user = lookupUser(options.singleUser)
-    if (!user) {
-      log.error(`User not found: ${options.singleUser}`)
-      process.exitCode = 1
-      return
-    }
-    users = [user]
-  } else {
-    users = enumerateUsers()
-  }
-
-  log.info(`Found ${users.length} user(s)`)
-
-  let totalSuccess = 0
-  let totalFailure = 0
-
-  for (const user of users) {
-    log.info(`Configuring hosts for ${user.username} (${user.homeDir})`)
-
-    const results = configureHosts({
-      servers: mcpConfig.servers,
-      dryRun: options.dryRun,
-      gid: user.gid,
-      uid: user.uid,
-      userHomeDir: user.homeDir,
-      username: user.username,
-    })
-
-    for (const result of results) {
-      if (result.success) totalSuccess++
-      else totalFailure++
-    }
-  }
-
-  log.info(`Hosts: ${totalSuccess} configured, ${totalFailure} failed`)
-
-  let extensionSuccess = 0
-  let extensionFailure = 0
-
-  const activeUsers = getActiveSessionUsers()
-  if (activeUsers === null) {
-    log.warn('Could not determine active sessions; installing extensions for all users')
-  }
-
-  for (const user of users) {
-    if (activeUsers !== null && !activeUsers.has(user.username)) {
-      log.info(`Skipping extensions for ${user.username} (no active session)`)
-      continue
-    }
-
-    log.info(`Installing extensions for ${user.username} (${user.homeDir})`)
-
-    const extResults = installExtensions({
-      dryRun: options.dryRun,
-      gid: user.gid,
-      uid: user.uid,
-      userHomeDir: user.homeDir,
-      username: user.username,
-    })
-
-    for (const result of extResults) {
-      if (result.skipped) continue
-      if (result.success) extensionSuccess++
-      else extensionFailure++
-    }
-  }
-
-  log.info(`Extensions: ${extensionSuccess} installed, ${extensionFailure} failed`)
-
-  // Extension installs are best-effort — a missing editor CLI is already
-  // recorded as a skip — so only host configuration failures fail the run.
-  if (totalFailure > 0) {
-    process.exitCode = 1
-  }
+  // Do not read legacy configs or self-update. In particular, --skip-update is
+  // passed by the updating parent and must not suppress schedule retirement.
+  // Unloading our own macOS job can terminate this process, so do this last.
+  uninstallSchedule({ dryRun: options.dryRun })
 }
 
 async function executeInstallSchedule(options: CliOptions): Promise<void> {
@@ -154,7 +67,7 @@ async function executeInstallSchedule(options: CliOptions): Promise<void> {
 }
 
 async function executeUninstallSchedule(options: CliOptions): Promise<void> {
-  uninstallSchedule()
+  uninstallSchedule({ dryRun: options.dryRun })
 }
 
 async function executeUninstall(options: CliOptions): Promise<void> {
@@ -181,26 +94,26 @@ async function executeConfig(options: CliOptions): Promise<void> {
   }
 }
 
-function setupProgram(): Command {
+export function setupProgram(): Command {
   const program = new Command()
 
   program
     .name('glean-mdm')
     .version(BUILD_VERSION)
-    .description('Configure MCP servers across AI coding tools on managed devices.')
+    .description('Deprecated: retire the legacy Glean MDM schedule. Use glean-helper for new deployments.')
 
   // Global options
   program
     .option('--dry-run', 'Simulate without making changes', false)
-    .option('--user <name>', 'Configure a single user instead of all users')
-    .option('--skip-update', 'Skip binary self-update check', false)
-    .option('--mcp-config <path>', 'Custom path to MCP config file')
-    .option('--mdm-config <path>', 'Custom path to MDM config file')
+    .option('--user <name>', 'Legacy compatibility flag (ignored; retirement is machine-wide)')
+    .option('--skip-update', 'Legacy compatibility flag (this release never self-updates)', false)
+    .option('--mcp-config <path>', 'Legacy compatibility flag (run does not read MCP config)')
+    .option('--mdm-config <path>', 'Legacy compatibility flag (run does not read MDM config)')
 
   // run command
   program
     .command('run')
-    .description('Run host configuration for all users')
+    .description('Retire the system schedule, preserving the binary and existing configuration')
     .action(async (cmdOptions, command) => {
       const globalOpts = command.parent?.opts() || {}
       const options = buildCliOptions('run', globalOpts)
@@ -210,7 +123,7 @@ function setupProgram(): Command {
   // install-schedule command
   program
     .command('install-schedule')
-    .description('Install system scheduled task (launchd/systemd/Task Scheduler)')
+    .description('Deprecated no-op: schedules can no longer be installed')
     .action(async (cmdOptions, command) => {
       const globalOpts = command.parent?.opts() || {}
       const options = buildCliOptions('install-schedule', globalOpts)
